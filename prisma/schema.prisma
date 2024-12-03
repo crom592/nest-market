@@ -1,0 +1,158 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 사용자 모델
+model User {
+  id               String          @id @default(cuid())
+  email            String          @unique
+  name             String
+  password         String
+  phoneNumber      String          @unique
+  role             UserRole        @default(CONSUMER)
+  trustScore       Int             @default(100)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  
+  // 소비자 관련
+  groupPurchases    GroupPurchase[] @relation("Creator")
+  participations    Participation[]
+  penalties        Penalty[]
+  bids            Bid[]
+  votes           Vote[]
+  
+  // 판매자 관련
+  sellerProfile    SellerProfile?
+}
+
+// 판매자 프로필
+model SellerProfile {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id])
+  businessName String
+  description String?
+  rating      Float     @default(0)
+  reviewCount Int       @default(0)
+  subscription SubscriptionTier @default(FREE)
+  points      Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// 공구 모델
+model GroupPurchase {
+  id             String          @id @default(cuid())
+  title          String
+  description    String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  creator        User            @relation("Creator", fields: [creatorId], references: [id])
+  creatorId      String
+  minMembers     Int
+  maxMembers     Int
+  currentPrice   Int             @default(0)
+  imageUrl       String?
+  endDate        DateTime
+  status         GroupPurchaseStatus @default(OPEN)
+  category       String
+  participations Participation[]
+  bids           Bid[]
+  votes          Vote[]
+}
+
+// 참여 모델
+model Participation {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  groupPurchaseId String
+  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
+  status          ParticipationStatus @default(JOINED)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([userId, groupPurchaseId])
+}
+
+// 입찰 모델
+model Bid {
+  id              String    @id @default(cuid())
+  sellerId        String
+  seller          User      @relation(fields: [sellerId], references: [id])
+  groupPurchaseId String
+  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
+  price           Float
+  description     String
+  status          BidStatus @default(PENDING)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// 투표 모델
+model Vote {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  groupPurchaseId String
+  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
+  bidId           String
+  createdAt       DateTime  @default(now())
+
+  @@unique([userId, groupPurchaseId])
+}
+
+// 페널티 모델
+model Penalty {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  reason      String
+  duration    Int
+  endDate     DateTime
+  createdAt   DateTime  @default(now())
+}
+
+// 열거형 정의
+enum UserRole {
+  CONSUMER
+  SELLER
+  ADMIN
+}
+
+enum GroupPurchaseStatus {
+  OPEN
+  CLOSED
+  CANCELLED
+}
+
+enum ParticipationStatus {
+  JOINED
+  CANCELLED
+}
+
+enum BidStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum PenaltyStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum SubscriptionTier {
+  FREE
+  PREMIUM
+}
