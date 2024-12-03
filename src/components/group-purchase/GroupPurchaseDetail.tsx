@@ -1,186 +1,220 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import Image from 'next/image';
-import { motion } from 'framer-motion';
-import { format } from 'date-fns';
+import { toast } from 'react-toastify';
+import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { GroupPurchase, Bid, User } from '@prisma/client';
+import BidForm from './BidForm';
+import ChatRoom from './ChatRoom';
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-}
-
-interface Participation {
-  id: string;
-  user: User;
-}
-
-interface Bid {
-  id: string;
-  price: number;
+interface ExtendedBid extends Bid {
   seller: User;
 }
 
-interface Vote {
-  id: string;
-  user: User;
+interface GroupPurchaseDetailProps {
+  groupPurchase: GroupPurchase;
+  initialBids: ExtendedBid[];
+  isParticipant: boolean;
+  hasVoted: boolean;
 }
 
-interface GroupPurchaseData {
-  id: string;
-  title: string;
-  description: string;
-  currentPrice: number;
-  minMembers: number;
-  maxMembers: number;
-  imageUrl: string | null;
-  endDate: string;
-  category: string;
-  status: 'OPEN' | 'CLOSED' | 'CANCELLED';
-  creator: User;
-  participations: Participation[];
-  bids: Bid[];
-  votes: Vote[];
-}
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1
-    }
-  }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0
-  }
-};
-
-export default function GroupPurchaseDetail({ data }: { data: GroupPurchaseData }) {
+export default function GroupPurchaseDetail({
+  groupPurchase: initialGroupPurchase,
+  initialBids,
+  isParticipant: initialIsParticipant,
+  hasVoted: initialHasVoted,
+}: GroupPurchaseDetailProps) {
   const { data: session } = useSession();
-  const participationProgress = (data.participations.length / data.maxMembers) * 100;
-  const timeLeft = format(new Date(data.endDate), 'yyyy년 MM월 dd일 HH:mm');
-  const lowestBid = data.bids.length > 0 
-    ? Math.min(...data.bids.map(bid => bid.price))
-    : data.currentPrice;
+  const [groupPurchase, setGroupPurchase] = useState(initialGroupPurchase);
+  const [bids, setBids] = useState(initialBids);
+  const [timeLeft, setTimeLeft] = useState<string>('');
+  const [isParticipant, setIsParticipant] = useState(initialIsParticipant);
+  const [hasVoted, setHasVoted] = useState(initialHasVoted);
+
+  useEffect(() => {
+    if (!groupPurchase?.auctionEndTime) return;
+
+    const timer = setInterval(() => {
+      const end = new Date(groupPurchase.auctionEndTime).getTime();
+      const now = new Date().getTime();
+      const distance = end - now;
+
+      if (distance < 0) {
+        setTimeLeft('경매 종료');
+        clearInterval(timer);
+        return;
+      }
+
+      const hours = Math.floor(distance / (1000 * 60 * 60));
+      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+      setTimeLeft(`${hours}시간 ${minutes}분 ${seconds}초`);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [groupPurchase?.auctionEndTime]);
+
+  const handleParticipate = async () => {
+    if (!session?.user) {
+      toast.error('로그인이 필요합니다.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/group-purchases/${groupPurchase.id}/participate`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error('참여에 실패했습니다.');
+      }
+
+      const data = await response.json();
+      setGroupPurchase(data.groupPurchase);
+      setIsParticipant(true);
+      toast.success('공구에 참여했습니다!');
+    } catch (error) {
+      console.error('Failed to participate:', error);
+      toast.error('참여 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleVote = async (approved: boolean) => {
+    if (!session?.user) {
+      toast.error('로그인이 필요합니다.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/group-purchases/${groupPurchase.id}/vote`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ approved }),
+      });
+
+      if (!response.ok) {
+        throw new Error('투표에 실패했습니다.');
+      }
+
+      setHasVoted(true);
+      toast.success('투표가 완료되었습니다!');
+    } catch (error) {
+      console.error('Failed to vote:', error);
+      toast.error('투표 중 오류가 발생했습니다.');
+    }
+  };
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="max-w-4xl mx-auto space-y-8"
-    >
-      {/* Hero Section */}
-      <motion.div variants={itemVariants} className="relative h-96 rounded-2xl overflow-hidden">
-        {data.imageUrl ? (
-          <Image
-            src={data.imageUrl}
-            alt={data.title}
-            fill
-            className="object-cover"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-r from-primary to-secondary opacity-20" />
-        )}
-        <div className="absolute inset-0 bg-black bg-opacity-40 flex items-end">
-          <div className="p-8 text-white">
-            <h1 className="text-4xl font-bold mb-4">{data.title}</h1>
-            <p className="text-lg opacity-90">{data.description}</p>
-          </div>
-        </div>
-      </motion.div>
+    <div className="space-y-8">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+        <h1 className="text-3xl font-bold mb-4">{groupPurchase.title}</h1>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div>
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold mb-2">상세 설명</h2>
+                <p className="text-gray-600 dark:text-gray-300">{groupPurchase.description}</p>
+              </div>
 
-      {/* Status and Progress */}
-      <motion.div variants={itemVariants} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="text-center">
-            <p className="text-gray-600 dark:text-gray-400 text-sm">현재 가격</p>
-            <p className="text-2xl font-bold text-primary">{lowestBid.toLocaleString()}원</p>
-          </div>
-          <div className="text-center">
-            <p className="text-gray-600 dark:text-gray-400 text-sm">참여 인원</p>
-            <p className="text-2xl font-bold text-secondary">
-              {data.participations.length} / {data.maxMembers}명
-            </p>
-          </div>
-          <div className="text-center">
-            <p className="text-gray-600 dark:text-gray-400 text-sm">마감일</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{timeLeft}</p>
-          </div>
-        </div>
+              <div>
+                <h2 className="text-lg font-semibold mb-2">참여 현황</h2>
+                <p className="text-gray-600 dark:text-gray-300">
+                  {groupPurchase.currentParticipants} / {groupPurchase.maxParticipants} 명
+                </p>
+              </div>
 
-        {/* Progress Bar */}
-        <div className="mt-6">
-          <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-600 dark:text-gray-400">진행률</span>
-            <span className="text-primary font-medium">{Math.round(participationProgress)}%</span>
-          </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-            <div
-              className="bg-primary h-2 rounded-full transition-all duration-500"
-              style={{ width: `${participationProgress}%` }}
-            />
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Details */}
-      <motion.div variants={itemVariants} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
-        <div className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">상세 정보</h2>
-          <dl className="space-y-6">
-            <div className="grid grid-cols-3 gap-4">
-              <dt className="text-sm font-medium text-gray-600 dark:text-gray-400">주최자</dt>
-              <dd className="text-sm text-gray-900 dark:text-white col-span-2">
-                {data.creator.name} ({data.creator.email})
-              </dd>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <dt className="text-sm font-medium text-gray-600 dark:text-gray-400">카테고리</dt>
-              <dd className="text-sm text-gray-900 dark:text-white col-span-2">
-                {data.category}
-              </dd>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <dt className="text-sm font-medium text-gray-600 dark:text-gray-400">참여자</dt>
-              <dd className="text-sm text-gray-900 dark:text-white col-span-2">
-                <div className="space-y-2">
-                  {data.participations.map((participation) => (
-                    <div key={participation.id} className="flex items-center space-x-2">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                        {participation.user.name[0]}
-                      </div>
-                      <span>{participation.user.name}</span>
-                    </div>
-                  ))}
+              {groupPurchase.expectedPrice && (
+                <div>
+                  <h2 className="text-lg font-semibold mb-2">희망 가격</h2>
+                  <p className="text-gray-600 dark:text-gray-300">
+                    {groupPurchase.expectedPrice.toLocaleString()}원
+                  </p>
                 </div>
-              </dd>
-            </div>
-          </dl>
-        </div>
-      </motion.div>
+              )}
 
-      {/* Actions */}
-      {session && (
-        <motion.div variants={itemVariants} className="flex justify-end space-x-4">
-          {session.user.id === data.creator.id ? (
-            <button className="button-hover px-6 py-3 bg-primary text-white rounded-lg font-medium">
-              공구 수정하기
-            </button>
-          ) : (
-            <button className="button-hover px-6 py-3 bg-secondary text-white rounded-lg font-medium">
-              참여하기
-            </button>
-          )}
-        </motion.div>
+              {timeLeft && (
+                <div>
+                  <h2 className="text-lg font-semibold mb-2">남은 시간</h2>
+                  <p className="text-gray-600 dark:text-gray-300">{timeLeft}</p>
+                </div>
+              )}
+            </div>
+
+            {!isParticipant && groupPurchase.status === 'RECRUITING' && (
+              <Button
+                onClick={handleParticipate}
+                className="w-full mt-6"
+              >
+                공구 참여하기
+              </Button>
+            )}
+          </div>
+
+          <div>
+            <h2 className="text-xl font-semibold mb-4">입찰 현황</h2>
+            {bids.length > 0 ? (
+              <div className="space-y-4">
+                {bids.map((bid) => (
+                  <div
+                    key={bid.id}
+                    className="p-4 border rounded-lg dark:border-gray-700"
+                  >
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-medium">판매자: {bid.seller.name}</span>
+                      <span className="text-lg font-bold">
+                        {bid.price.toLocaleString()}원
+                      </span>
+                    </div>
+                    <p className="text-gray-600 dark:text-gray-300">{bid.description}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500">아직 입찰이 없습니다.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {groupPurchase.status === 'VOTING' && isParticipant && !hasVoted && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">최종 입찰 투표</h2>
+          <p className="mb-4">
+            가장 낮은 입찰가의 판매자가 선정되었습니다. 해당 판매자와 거래를 진행하시겠습니까?
+          </p>
+          <div className="flex space-x-4">
+            <Button
+              onClick={() => handleVote(true)}
+              variant="default"
+              className="flex-1"
+            >
+              찬성
+            </Button>
+            <Button
+              onClick={() => handleVote(false)}
+              variant="outline"
+              className="flex-1"
+            >
+              반대
+            </Button>
+          </div>
+        </div>
       )}
-    </motion.div>
+
+      {session?.user?.role === 'SELLER' && groupPurchase.status === 'BIDDING' && (
+        <BidForm 
+          groupPurchaseId={groupPurchase.id} 
+          onBidSubmitted={(newBid) => setBids([...bids, newBid as ExtendedBid])} 
+        />
+      )}
+
+      {isParticipant && <ChatRoom groupPurchaseId={groupPurchase.id} />}
+    </div>
   );
 }

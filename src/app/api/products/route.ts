@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma';
 
 export async function GET() {
   try {
@@ -12,16 +10,40 @@ export async function GET() {
       orderBy: {
         createdAt: 'desc',
       },
-    });
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        currentPrice: true,
+        minMembers: true,
+        maxMembers: true,
+        imageUrl: true,
+        endDate: true,
+        category: true,
+        status: true,
+        createdAt: true,
+      }
+    }) || [];
 
-    return NextResponse.json(products);
+    return new NextResponse(
+      JSON.stringify({ products }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   } catch (err) {
     console.error('Failed to fetch products:', err);
-    return NextResponse.json(
-      { error: 'Failed to fetch products' },
-      { status: 500 }
+    return new NextResponse(
+      JSON.stringify({ error: 'Failed to fetch products' }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }

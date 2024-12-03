@@ -10,132 +10,20 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 사용자 모델
-model User {
-  id               String          @id @default(cuid())
-  email            String          @unique
-  name             String
-  password         String
-  phoneNumber      String          @unique
-  role             UserRole        @default(CONSUMER)
-  trustScore       Int             @default(100)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  
-  // 소비자 관련
-  groupPurchases    GroupPurchase[] @relation("Creator")
-  participations    Participation[]
-  penalties        Penalty[]
-  bids            Bid[]
-  votes           Vote[]
-  
-  // 판매자 관련
-  sellerProfile    SellerProfile?
-}
-
-// 판매자 프로필
-model SellerProfile {
-  id          String    @id @default(cuid())
-  userId      String    @unique
-  user        User      @relation(fields: [userId], references: [id])
-  businessName String
-  description String?
-  rating      Float     @default(0)
-  reviewCount Int       @default(0)
-  subscription SubscriptionTier @default(FREE)
-  points      Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-}
-
-// 공구 모델
-model GroupPurchase {
-  id             String          @id @default(cuid())
-  title          String
-  description    String
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  creator        User            @relation("Creator", fields: [creatorId], references: [id])
-  creatorId      String
-  minMembers     Int
-  maxMembers     Int
-  currentPrice   Int             @default(0)
-  imageUrl       String?
-  endDate        DateTime
-  status         GroupPurchaseStatus @default(OPEN)
-  category       String
-  participations Participation[]
-  bids           Bid[]
-  votes          Vote[]
-}
-
-// 참여 모델
-model Participation {
-  id              String    @id @default(cuid())
-  userId          String
-  user            User      @relation(fields: [userId], references: [id])
-  groupPurchaseId String
-  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
-  status          ParticipationStatus @default(JOINED)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  @@unique([userId, groupPurchaseId])
-}
-
-// 입찰 모델
-model Bid {
-  id              String    @id @default(cuid())
-  sellerId        String
-  seller          User      @relation(fields: [sellerId], references: [id])
-  groupPurchaseId String
-  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
-  price           Float
-  description     String
-  status          BidStatus @default(PENDING)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-}
-
-// 투표 모델
-model Vote {
-  id              String    @id @default(cuid())
-  userId          String
-  user            User      @relation(fields: [userId], references: [id])
-  groupPurchaseId String
-  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
-  bidId           String
-  createdAt       DateTime  @default(now())
-
-  @@unique([userId, groupPurchaseId])
-}
-
-// 페널티 모델
-model Penalty {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id])
-  reason      String
-  duration    Int
-  endDate     DateTime
-  createdAt   DateTime  @default(now())
-}
-
-// 열거형 정의
 enum UserRole {
   CONSUMER
   SELLER
   ADMIN
 }
 
-enum GroupPurchaseStatus {
-  OPEN
-  CLOSED
-  CANCELLED
-}
-
-enum ParticipationStatus {
-  JOINED
+enum PurchaseStatus {
+  DRAFT
+  RECRUITING
+  BIDDING
+  VOTING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
   CANCELLED
 }
 
@@ -143,16 +31,182 @@ enum BidStatus {
   PENDING
   ACCEPTED
   REJECTED
-  WITHDRAWN
 }
 
-enum PenaltyStatus {
-  ACTIVE
-  COMPLETED
-  CANCELLED
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
-enum SubscriptionTier {
-  FREE
-  PREMIUM
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          UserRole  @default(CONSUMER)
+  phone         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // 패널티 관련
+  penaltyCount    Int       @default(0)
+  penaltyEndTime  DateTime?
+  lastParticipation DateTime?
+
+  // 판매자 관련
+  points        Int     @default(0)
+  bidCount      Int     @default(0)
+  rating        Float?
+
+  // 관계
+  groupPurchases GroupPurchase[] @relation("Creator")
+  participations Participation[]
+  bids          Bid[]
+  votes         Vote[]
+  messages      Message[]
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model GroupPurchase {
+  id              String         @id @default(cuid())
+  title           String
+  description     String
+  creatorId       String
+  creator         User           @relation("Creator", fields: [creatorId], references: [id])
+  status          PurchaseStatus @default(DRAFT)
+  minParticipants Int           @default(3)
+  maxParticipants Int           @default(100)
+  currentParticipants Int       @default(1)
+  
+  // 경매 관련
+  auctionStartTime DateTime?
+  auctionEndTime   DateTime?
+  selectedBidId    String?
+  
+  // 투표 관련
+  isVotingOpen     Boolean       @default(false)
+  votingEndTime    DateTime?
+  
+  // 가격 관련
+  expectedPrice    Float?
+  finalPrice       Float?
+  
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  
+  // 관계
+  participants     Participation[]
+  bids            Bid[]
+  votes           Vote[]
+  messages        Message[]
+  chatRoom        ChatRoom?
+
+  @@index([creatorId])
+  @@index([status])
+}
+
+model Participation {
+  id              String        @id @default(cuid())
+  userId          String
+  groupPurchaseId String
+  joinedAt        DateTime      @default(now())
+  
+  user            User          @relation(fields: [userId], references: [id])
+  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
+
+  @@unique([userId, groupPurchaseId])
+  @@index([userId])
+  @@index([groupPurchaseId])
+}
+
+model Bid {
+  id              String        @id @default(cuid())
+  sellerId        String
+  groupPurchaseId String
+  price           Float
+  description     String
+  status          BidStatus     @default(PENDING)
+  createdAt       DateTime      @default(now())
+  
+  seller          User          @relation(fields: [sellerId], references: [id])
+  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
+  votes           Vote[]
+  
+  @@index([sellerId])
+  @@index([groupPurchaseId])
+}
+
+model Vote {
+  id              String        @id @default(cuid())
+  userId          String
+  groupPurchaseId String
+  bidId           String
+  votedAt         DateTime      @default(now())
+  
+  user            User          @relation(fields: [userId], references: [id])
+  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
+  bid             Bid           @relation(fields: [bidId], references: [id])
+  
+  @@unique([userId, groupPurchaseId])
+  @@index([groupPurchaseId])
+}
+
+model Message {
+  id              String        @id @default(cuid())
+  content         String
+  userId          String
+  groupPurchaseId String
+  chatRoomId      String
+  createdAt       DateTime      @default(now())
+  
+  user            User          @relation(fields: [userId], references: [id])
+  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
+  chatRoom        ChatRoom      @relation(fields: [chatRoomId], references: [id])
+  
+  @@index([userId])
+  @@index([groupPurchaseId])
+  @@index([chatRoomId])
+}
+
+model ChatRoom {
+  id              String        @id @default(cuid())
+  groupPurchaseId String        @unique
+  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
+  messages        Message[]
 }

@@ -3,15 +3,17 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 
-interface FormData {
+interface CreateGroupPurchaseFormData {
   title: string;
   description: string;
-  minMembers: number;
-  maxMembers: number;
-  endDate: string;
-  imageUrl?: string;
+  minParticipants: number;
+  maxParticipants: number;
+  expectedPrice: number;
+  auctionDuration: number; // 시간 단위
 }
 
 const formVariants = {
@@ -36,48 +38,52 @@ const inputVariants = {
 };
 
 export default function CreateGroupPurchaseForm() {
-  const router = useRouter();
-  const { data: session } = useSession();
-  const [formData, setFormData] = useState<FormData>({
-    title: '',
-    description: '',
-    minMembers: 2,
-    maxMembers: 10,
-    endDate: '',
-    imageUrl: '',
-  });
-  const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { data: session } = useSession();
+  const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage('');
-    setIsSubmitting(true);
+  const form = useForm<CreateGroupPurchaseFormData>({
+    defaultValues: {
+      title: '',
+      description: '',
+      minParticipants: 3,
+      maxParticipants: 10,
+      expectedPrice: 0,
+      auctionDuration: 24,
+    },
+  });
 
-    if (!session) {
-      setErrorMessage('로그인이 필요합니다.');
-      setIsSubmitting(false);
+  const onSubmit = async (data: CreateGroupPurchaseFormData) => {
+    if (!session?.user) {
+      toast.error('로그인이 필요합니다.');
       return;
     }
 
     try {
-      const response = await fetch('/api/group-purchase', {
+      setIsSubmitting(true);
+      const response = await fetch('/api/group-purchases', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...data,
+          auctionStartTime: new Date(),
+          auctionEndTime: new Date(Date.now() + data.auctionDuration * 60 * 60 * 1000),
+        }),
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || '공구 생성에 실패했습니다.');
+        throw new Error('공구 생성에 실패했습니다.');
       }
 
-      router.push('/group-purchases');
-    } catch (err) {
-      console.error('Failed to create group purchase:', err);
-      setErrorMessage(err instanceof Error ? err.message : '공구 생성에 실패했습니다.');
+      const result = await response.json();
+      toast.success('공구가 생성되었습니다!');
+      router.push(`/group-purchases/${result.id}`);
+    } catch (error) {
+      toast.error('공구 생성 중 오류가 발생했습니다.');
+      console.error(error);
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -89,124 +95,152 @@ export default function CreateGroupPurchaseForm() {
       variants={formVariants}
       className="max-w-2xl mx-auto"
     >
-      <form onSubmit={handleSubmit} className="space-y-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
-        <div className="space-y-2">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">새로운 공구 만들기</h2>
-          <p className="text-gray-600 dark:text-gray-400">함께 구매하고 싶은 상품을 공유해보세요.</p>
-        </div>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
+          <FormField
+            control={form.control}
+            name="title"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>공구 제목</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="공구하고 싶은 제품/서비스 제목을 입력하세요" />
+                </FormControl>
+                <FormDescription>
+                  구체적인 모델명이나 서비스 내용을 포함하면 좋습니다.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        <div className="space-y-6">
-          <motion.div variants={inputVariants} whileFocus="focus">
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              공구 제목
-            </label>
-            <input
-              type="text"
-              id="title"
-              required
-              className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-primary dark:bg-gray-700 dark:text-white sm:text-sm transition-all duration-200"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="상품명을 입력해주세요"
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>상세 설명</FormLabel>
+                <FormControl>
+                  <Textarea
+                    {...field}
+                    placeholder="원하는 제품/서비스에 대해 자세히 설명해주세요"
+                    className="h-32"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FormField
+              control={form.control}
+              name="minParticipants"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>최소 참여 인원</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="number"
+                      min={3}
+                      max={100}
+                      onChange={e => field.onChange(parseInt(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormDescription>최소 3명 이상</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </motion.div>
 
-          <motion.div variants={inputVariants} whileFocus="focus">
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              상세 설명
-            </label>
-            <textarea
-              id="description"
-              rows={4}
-              required
-              className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-primary dark:bg-gray-700 dark:text-white sm:text-sm transition-all duration-200"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="상품에 대한 상세한 설명을 입력해주세요"
+            <FormField
+              control={form.control}
+              name="maxParticipants"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>최대 참여 인원</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="number"
+                      min={3}
+                      max={100}
+                      onChange={e => field.onChange(parseInt(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormDescription>최대 100명까지</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </motion.div>
-
-          <motion.div variants={inputVariants} whileFocus="focus">
-            <label htmlFor="imageUrl" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              상품 이미지 URL
-            </label>
-            <input
-              type="url"
-              id="imageUrl"
-              className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-primary dark:bg-gray-700 dark:text-white sm:text-sm transition-all duration-200"
-              value={formData.imageUrl}
-              onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-              placeholder="https://example.com/image.jpg"
-            />
-          </motion.div>
-
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <motion.div variants={inputVariants} whileFocus="focus">
-              <label htmlFor="minMembers" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                최소 인원
-              </label>
-              <input
-                type="number"
-                id="minMembers"
-                min="2"
-                required
-                className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-primary dark:bg-gray-700 dark:text-white sm:text-sm transition-all duration-200"
-                value={formData.minMembers}
-                onChange={(e) => setFormData({ ...formData, minMembers: parseInt(e.target.value) })}
-              />
-            </motion.div>
-
-            <motion.div variants={inputVariants} whileFocus="focus">
-              <label htmlFor="maxMembers" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                최대 인원
-              </label>
-              <input
-                type="number"
-                id="maxMembers"
-                min={formData.minMembers}
-                required
-                className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-primary dark:bg-gray-700 dark:text-white sm:text-sm transition-all duration-200"
-                value={formData.maxMembers}
-                onChange={(e) => setFormData({ ...formData, maxMembers: parseInt(e.target.value) })}
-              />
-            </motion.div>
           </div>
 
-          <motion.div variants={inputVariants} whileFocus="focus">
-            <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              마감일
-            </label>
-            <input
-              type="datetime-local"
-              id="endDate"
-              required
-              className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-primary dark:bg-gray-700 dark:text-white sm:text-sm transition-all duration-200"
-              value={formData.endDate}
-              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-            />
-          </motion.div>
-        </div>
+          <FormField
+            control={form.control}
+            name="expectedPrice"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>희망 가격</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    type="number"
+                    min={0}
+                    onChange={e => field.onChange(parseInt(e.target.value))}
+                  />
+                </FormControl>
+                <FormDescription>
+                  원하는 가격대를 입력해주세요 (선택사항)
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        {errorMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-red-500 text-sm bg-red-50 dark:bg-red-900/20 p-3 rounded-lg"
+          <FormField
+            control={form.control}
+            name="auctionDuration"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>경매 진행 시간</FormLabel>
+                <Select
+                  onValueChange={(value) => field.onChange(parseInt(value))}
+                  defaultValue={field.value.toString()}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="경매 진행 시간을 선택하세요" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="6">6시간</SelectItem>
+                    <SelectItem value="12">12시간</SelectItem>
+                    <SelectItem value="24">24시간</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormDescription>
+                  판매자들이 입찰할 수 있는 시간을 설정합니다
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={isSubmitting}
           >
-            {errorMessage}
-          </motion.div>
-        )}
-
-        <motion.button
-          type="submit"
-          disabled={isSubmitting}
-          className="button-hover w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          {isSubmitting ? '처리중...' : '공구 만들기'}
-        </motion.button>
-      </form>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                생성 중...
+              </>
+            ) : (
+              '공구 생성하기'
+            )}
+          </Button>
+        </form>
+      </Form>
     </motion.div>
   );
 }

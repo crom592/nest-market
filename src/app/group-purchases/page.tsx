@@ -1,59 +1,59 @@
-import { PrismaClient } from '@prisma/client';
+'use client';
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import GroupPurchaseList from '@/components/group-purchase/GroupPurchaseList';
+import { GroupPurchase } from '@prisma/client';
 
-const prisma = new PrismaClient();
+export default function GroupPurchasesPage() {
+  const [purchases, setPurchases] = useState<GroupPurchase[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-async function getGroupPurchases() {
-  const groupPurchases = await prisma.groupPurchase.findMany({
-    include: {
-      creator: {
-        select: {
-          name: true,
-          email: true,
-        },
-      },
-      participations: {
-        select: {
-          id: true,
-          userId: true,
-          status: true,
-        },
-      },
-      bids: {
-        select: {
-          id: true,
-          price: true,
-          status: true,
-          seller: {
-            select: {
-              name: true,
-              sellerProfile: true,
-            },
-          },
-        },
-      },
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-  });
+  useEffect(() => {
+    const fetchPurchases = async () => {
+      try {
+        const response = await fetch('/api/group-purchases');
+        if (!response.ok) {
+          throw new Error('Failed to fetch group purchases');
+        }
+        const data = await response.json();
+        setPurchases(data.groupPurchases);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '공구 목록을 불러오는데 실패했습니다.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  return groupPurchases;
-}
-
-export default async function GroupPurchasesPage() {
-  const groupPurchases = await getGroupPurchases();
+    fetchPurchases();
+  }, []);
 
   return (
-    <div className="container mx-auto px-4">
-      <div className="mb-8">
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900">공구 목록</h1>
-        <p className="mt-2 text-gray-600">
-          현재 진행 중인 모든 공구 목록입니다. 원하는 공구에 참여하거나 새로운
-          공구를 만들어보세요.
-        </p>
+        <Link
+          href="/group-purchases/create"
+          className="inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 text-sm font-medium text-white shadow transition-colors hover:bg-primary/90"
+        >
+          새 공구 만들기
+        </Link>
       </div>
-      <GroupPurchaseList groupPurchases={groupPurchases} />
+
+      {error ? (
+        <div className="text-center py-12">
+          <p className="text-red-500 text-lg">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 text-sm font-medium text-white shadow transition-colors hover:bg-primary/90"
+          >
+            다시 시도
+          </button>
+        </div>
+      ) : (
+        <GroupPurchaseList purchases={purchases} isLoading={isLoading} />
+      )}
     </div>
   );
 }
