@@ -22,7 +22,7 @@ export default async function RootLayout({
       <body className="min-h-screen bg-gray-50 flex flex-col">
         <SessionProvider session={session}>
           <Header />
-          <main className="flex-grow w-full">
+          <main className="flex-grow w-full pt-16">
             {children}
           </main>
           <Footer />

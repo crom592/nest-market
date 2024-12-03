@@ -1,55 +1,70 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, PurchaseStatus, UserRole } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  // Sample Users
-  const user1 = await prisma.user.create({
+  // Clear existing data
+  await prisma.groupPurchase.deleteMany();
+  await prisma.user.deleteMany();
+
+  // Create admin user
+  const admin = await prisma.user.create({
     data: {
-      email: 'sparrow1@example.com',
-      name: '참새1',
-      password: 'password123',
-      phoneNumber: '01012345678',
-      role: 'CONSUMER',
+      email: 'admin@nestmarket.com',
+      name: '관리자',
+      role: UserRole.ADMIN,
     },
   });
 
-  const user2 = await prisma.user.create({
-    data: {
-      email: 'sparrow2@example.com',
-      name: '참새2',
-      password: 'password123',
-      phoneNumber: '01087654321',
-      role: 'CONSUMER',
+  // Create sample products
+  const products = [
+    {
+      title: '맥북 프로 16인치 M3 Pro 공동구매',
+      description: '애플 공식 리셀러를 통한 대량 구매로 최저가 도전!',
+      status: PurchaseStatus.RECRUITING,
+      minParticipants: 10,
+      maxParticipants: 50,
+      currentParticipants: 5,
+      expectedPrice: 2800000,
+      imageUrl: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca4?w=800&auto=format&fit=crop',
+      creatorId: admin.id
     },
-  });
+    {
+      title: '다이슨 에어랩 공동구매',
+      description: '다이슨 코리아 공식 루트를 통한 최저가 공동구매',
+      status: PurchaseStatus.RECRUITING,
+      minParticipants: 20,
+      maxParticipants: 100,
+      currentParticipants: 15,
+      expectedPrice: 450000,
+      imageUrl: 'https://images.unsplash.com/photo-1522338242992-e1a54906a8da?w=800&auto=format&fit=crop',
+      creatorId: admin.id
+    },
+    {
+      title: '닌텐도 스위치 OLED 공동구매',
+      description: '닌텐도 공식 수입원을 통한 대량 구매',
+      status: PurchaseStatus.RECRUITING,
+      minParticipants: 30,
+      maxParticipants: 150,
+      currentParticipants: 25,
+      expectedPrice: 330000,
+      imageUrl: 'https://images.unsplash.com/photo-1578303512597-81e6cc155b3e?w=800&auto=format&fit=crop',
+      creatorId: admin.id
+    }
+  ];
 
-  // Sample Group Purchase
-  await prisma.groupPurchase.create({
-    data: {
-      title: 'LG전자 울트라기어 27GP750 공구',
-      description: 'LG전자 모니터 공동 구매',
-      creatorId: user1.id,
-      minMembers: 3,
-      maxMembers: 50,
-      endDate: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24 hours from now
-    },
-  });
+  for (const product of products) {
+    await prisma.groupPurchase.create({
+      data: product
+    });
+  }
 
-  // Sample Penalty
-  await prisma.penalty.create({
-    data: {
-      userId: user2.id,
-      reason: 'No-show',
-      duration: 24,
-      endDate: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24 hours from now
-    },
-  });
+  console.log('Seed data created successfully');
 }
 
 main()
   .catch((e) => {
-    console.error(e);
+    console.error('Error while seeding:', e);
     process.exit(1);
   })
   .finally(async () => {

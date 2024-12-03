@@ -6,6 +6,26 @@ import { useSession } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2 } from "lucide-react";
 
 interface CreateGroupPurchaseFormData {
   title: string;
@@ -24,15 +44,6 @@ const formVariants = {
     transition: {
       duration: 0.6,
       ease: [0.16, 1, 0.3, 1]
-    }
-  }
-};
-
-const inputVariants = {
-  focus: {
-    scale: 1.02,
-    transition: {
-      duration: 0.2
     }
   }
 };

@@ -11,26 +11,26 @@ datasource db {
 }
 
 enum UserRole {
-  CONSUMER
-  SELLER
+  CONSUMER // 참새
+  SELLER  // 어미새
   ADMIN
 }
 
 enum PurchaseStatus {
-  DRAFT
-  RECRUITING
-  BIDDING
-  VOTING
-  CONFIRMED
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
+  DRAFT       // 임시저장
+  RECRUITING  // 참여자 모집 중
+  BIDDING     // 입찰 진행 중
+  VOTING      // 투표 진행 중
+  CONFIRMED   // 낙찰 완료
+  IN_PROGRESS // 거래 진행 중
+  COMPLETED   // 완료
+  CANCELLED   // 취소됨
 }
 
 enum BidStatus {
-  PENDING
-  ACCEPTED
-  REJECTED
+  PENDING   // 입찰 중
+  ACCEPTED  // 낙찰됨
+  REJECTED  // 거절됨
 }
 
 model Account {
@@ -89,66 +89,70 @@ model User {
   lastParticipation DateTime?
 
   // 판매자 관련
-  points        Int     @default(0)
-  bidCount      Int     @default(0)
-  rating        Float?
+  points        Int     @default(0)  // 입찰 포인트
+  bidCount      Int     @default(0)  // 입찰 횟수
+  rating        Float?  // 평점
 
   // 관계
-  groupPurchases GroupPurchase[] @relation("Creator")
-  participations Participation[]
-  bids          Bid[]
-  votes         Vote[]
-  messages      Message[]
+  groupPurchases GroupPurchase[] @relation("Creator")  // 생성한 공구
+  participations Participant[]   // 참여한 공구
+  bids          Bid[]           // 입찰 내역
+  votes         Vote[]          // 투표 내역
+  messages      Message[]       // 채팅 메시지
   accounts      Account[]
   sessions      Session[]
+
+  @@index([email])
+  @@index([phone])
 }
 
 model GroupPurchase {
-  id              String         @id @default(cuid())
-  title           String
-  description     String
-  creatorId       String
-  creator         User           @relation("Creator", fields: [creatorId], references: [id])
-  status          PurchaseStatus @default(DRAFT)
-  minParticipants Int           @default(3)
-  maxParticipants Int           @default(100)
-  currentParticipants Int       @default(1)
+  id          String   @id @default(cuid())
+  title       String   // 공구 제목
+  description String   // 상세 설명
+  imageUrl    String?  // 이미지
+  
+  // 모집 관련
+  minParticipants Int  // 최소 참여자 수
+  maxParticipants Int  // 최대 참여자 수
+  currentParticipants Int @default(0)  // 현재 참여자 수
+  
+  // 상태 관련
+  status      PurchaseStatus @default(DRAFT)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   
   // 경매 관련
-  auctionStartTime DateTime?
-  auctionEndTime   DateTime?
-  selectedBidId    String?
+  auctionStartTime DateTime?  // 입찰 시작 시간
+  auctionEndTime   DateTime?  // 입찰 마감 시간
   
   // 투표 관련
-  isVotingOpen     Boolean       @default(false)
-  votingEndTime    DateTime?
+  voteStartTime    DateTime?  // 투표 시작 시간
+  voteEndTime      DateTime?  // 투표 마감 시간
+  voteThreshold    Float     @default(0.5)  // 투표 통과 기준 (기본 50%)
   
-  // 가격 관련
-  expectedPrice    Float?
-  finalPrice       Float?
-  
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  
+  // 생성자 관련
+  creatorId   String
+  creator     User     @relation("Creator", fields: [creatorId], references: [id])
+
   // 관계
-  participants     Participation[]
-  bids            Bid[]
-  votes           Vote[]
-  messages        Message[]
-  chatRoom        ChatRoom?
+  participants Participant[]  // 참여자 목록
+  bids        Bid[]          // 입찰 목록
+  votes       Vote[]         // 투표 목록
+  messages    Message[]      // 채팅 메시지
 
   @@index([creatorId])
   @@index([status])
 }
 
-model Participation {
-  id              String        @id @default(cuid())
+model Participant {
+  id              String   @id @default(cuid())
   userId          String
   groupPurchaseId String
-  joinedAt        DateTime      @default(now())
+  joinedAt        DateTime @default(now())
   
-  user            User          @relation(fields: [userId], references: [id])
-  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
+  user          User          @relation(fields: [userId], references: [id])
+  groupPurchase GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
 
   @@unique([userId, groupPurchaseId])
   @@index([userId])
@@ -156,57 +160,49 @@ model Participation {
 }
 
 model Bid {
-  id              String        @id @default(cuid())
-  sellerId        String
-  groupPurchaseId String
-  price           Float
-  description     String
-  status          BidStatus     @default(PENDING)
-  createdAt       DateTime      @default(now())
+  id              String    @id @default(cuid())
+  price           Int       // 입찰 가격
+  description     String    // 입찰 설명
+  status          BidStatus @default(PENDING)
+  createdAt       DateTime  @default(now())
   
-  seller          User          @relation(fields: [sellerId], references: [id])
-  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
-  votes           Vote[]
+  sellerId        String    // 판매자 ID
+  groupPurchaseId String    // 공구 ID
   
+  seller        User          @relation(fields: [sellerId], references: [id])
+  groupPurchase GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
+
   @@index([sellerId])
   @@index([groupPurchaseId])
 }
 
 model Vote {
-  id              String        @id @default(cuid())
+  id              String   @id @default(cuid())
+  approved        Boolean  // 찬성/반대
+  createdAt       DateTime @default(now())
+  
   userId          String
   groupPurchaseId String
-  bidId           String
-  votedAt         DateTime      @default(now())
   
-  user            User          @relation(fields: [userId], references: [id])
-  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
-  bid             Bid           @relation(fields: [bidId], references: [id])
-  
+  user          User          @relation(fields: [userId], references: [id])
+  groupPurchase GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
+
   @@unique([userId, groupPurchaseId])
+  @@index([userId])
   @@index([groupPurchaseId])
 }
 
 model Message {
-  id              String        @id @default(cuid())
-  content         String
+  id              String   @id @default(cuid())
+  content         String   // 메시지 내용
+  createdAt       DateTime @default(now())
+  
   userId          String
   groupPurchaseId String
-  chatRoomId      String
-  createdAt       DateTime      @default(now())
   
-  user            User          @relation(fields: [userId], references: [id])
-  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
-  chatRoom        ChatRoom      @relation(fields: [chatRoomId], references: [id])
-  
+  sender        User          @relation(fields: [userId], references: [id])
+  groupPurchase GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
+
   @@index([userId])
   @@index([groupPurchaseId])
-  @@index([chatRoomId])
-}
-
-model ChatRoom {
-  id              String        @id @default(cuid())
-  groupPurchaseId String        @unique
-  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
-  messages        Message[]
 }

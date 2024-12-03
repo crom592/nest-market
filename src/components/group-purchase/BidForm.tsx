@@ -1,24 +1,13 @@
-'use client';
-
-import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-toastify';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Loader2 } from 'lucide-react';
 
 interface BidFormProps {
   groupPurchaseId: string;
-  onBidSubmitted: (bid: any) => void;
+  onBidSubmitted: (bid: BidData) => void;
 }
 
 interface BidFormData {
@@ -26,35 +15,40 @@ interface BidFormData {
   description: string;
 }
 
+interface BidData {
+  id: string;
+  price: number;
+  description: string;
+  userId: string;
+  groupPurchaseId: string;
+  createdAt: Date;
+}
+
 export default function BidForm({ groupPurchaseId, onBidSubmitted }: BidFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const form = useForm<BidFormData>({
-    defaultValues: {
-      price: 0,
-      description: '',
-    },
-  });
+  const { register, handleSubmit } = useForm<BidFormData>();
 
   const onSubmit = async (data: BidFormData) => {
+    setIsSubmitting(true);
     try {
-      setIsSubmitting(true);
-      const response = await fetch(`/api/group-purchases/${groupPurchaseId}/bid`, {
+      const response = await fetch('/api/bids', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          groupPurchaseId,
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('입찰에 실패했습니다.');
+        throw new Error('Failed to submit bid');
       }
 
       const result = await response.json();
       onBidSubmitted(result.bid);
       toast.success('입찰이 완료되었습니다!');
-      form.reset();
     } catch (error) {
       console.error('Failed to submit bid:', error);
       toast.error('입찰 중 오류가 발생했습니다.');
@@ -66,62 +60,37 @@ export default function BidForm({ groupPurchaseId, onBidSubmitted }: BidFormProp
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
       <h2 className="text-xl font-semibold mb-6">입찰하기</h2>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <FormField
-            control={form.control}
-            name="price"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>입찰 가격</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    min={0}
-                    placeholder="가격을 입력하세요"
-                    {...field}
-                    onChange={(e) => field.onChange(parseInt(e.target.value))}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <div className="space-y-2">
+          <label htmlFor="price" className="text-sm font-medium">
+            입찰가격
+          </label>
+          <Input
+            id="price"
+            type="number"
+            {...register('price', {
+              required: '입찰가격을 입력해주세요',
+              min: { value: 0, message: '0원 이상 입력해주세요' },
+            })}
           />
+        </div>
 
-          <FormField
-            control={form.control}
-            name="description"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>상세 설명</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="제품/서비스에 대한 상세 설명을 입력하세요"
-                    className="h-32"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+        <div className="space-y-2">
+          <label htmlFor="description" className="text-sm font-medium">
+            입찰 설명
+          </label>
+          <Textarea
+            id="description"
+            {...register('description', {
+              required: '입찰 설명을 입력해주세요',
+            })}
           />
+        </div>
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                입찰 중...
-              </>
-            ) : (
-              '입찰하기'
-            )}
-          </Button>
-        </form>
-      </Form>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? '입찰 중...' : '입찰하기'}
+        </Button>
+      </form>
     </div>
   );
 }

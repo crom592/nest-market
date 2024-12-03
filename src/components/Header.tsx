@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, ShoppingBag } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -21,7 +21,7 @@ export default function Header() {
 
   const navItems = [
     { href: '/', label: '홈' },
-    { href: '/products', label: '상품' },
+    { href: '/group-purchases', label: '공구목록' },
     { href: '/about', label: '소개' },
     { href: '/inquiries', label: '문의하기' },
   ];
@@ -69,9 +69,6 @@ export default function Header() {
           >
             공구 만들기
           </Link>
-          <button className="hover:text-primary transition-colors duration-300">
-            <ShoppingBag className="w-6 h-6" />
-          </button>
           <button 
             className="md:hidden hover:text-primary transition-colors duration-300"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -102,6 +99,15 @@ export default function Header() {
                 </Link>
               </li>
             ))}
+            <li>
+              <Link 
+                href="/group-purchases/create" 
+                className="block py-3 px-4 text-primary font-medium hover:bg-primary/10"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                공구 만들기
+              </Link>
+            </li>
           </ul>
         </nav>
       </div>

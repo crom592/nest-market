@@ -1,16 +1,17 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { GroupPurchaseStatus } from '@prisma/client';
 
-export async function POST(req: Request) {
+export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await req.json();
+    const body = await request.json();
     const {
       title,
       description,
@@ -81,15 +82,15 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET(req: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
     const skip = (page - 1) * limit;
 
-    const where = status ? { status } : {};
+    const where = status ? { status: status as GroupPurchaseStatus } : {};
 
     const [groupPurchases, total] = await Promise.all([
       prisma.groupPurchase.findMany({
@@ -100,12 +101,14 @@ export async function GET(req: Request) {
               id: true,
               name: true,
               email: true,
+              role: true,
             },
           },
           _count: {
             select: {
               participants: true,
               bids: true,
+              votes: true,
             },
           },
         },
@@ -118,7 +121,7 @@ export async function GET(req: Request) {
       prisma.groupPurchase.count({ where }),
     ]);
 
-    return NextResponse.json({
+    const response = {
       groupPurchases,
       pagination: {
         total,
@@ -126,12 +129,11 @@ export async function GET(req: Request) {
         page,
         limit,
       },
-    });
+    };
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error('Failed to fetch group purchases:', error);
-    return NextResponse.json(
-      { error: '공구 목록을 불러오는데 실패했습니다.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: '공구 목록을 불러오는데 실패했습니다.' }, { status: 500 });
   }
 }
