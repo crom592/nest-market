@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { SessionProvider } from '@/components/SessionProvider';
 import './globals.css';
 import Header from '@/components/Header';
+import Footer from '@/components/layout/Footer';
 
 export const metadata: Metadata = {
   title: '둥지마켓 - 소비자 주도형 공동구매 플랫폼',
@@ -18,12 +19,13 @@ export default async function RootLayout({
 
   return (
     <html lang="ko">
-      <body className="min-h-screen bg-gray-50">
+      <body className="min-h-screen bg-gray-50 flex flex-col">
         <SessionProvider session={session}>
           <Header />
-          <main className="w-full">
+          <main className="flex-grow w-full">
             {children}
           </main>
+          <Footer />
         </SessionProvider>
       </body>
     </html>
