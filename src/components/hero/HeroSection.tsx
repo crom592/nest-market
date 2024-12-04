@@ -23,7 +23,7 @@ export default function HeroSection() {
           함께하는 소비의 즐거움
         </h1>
         <p className="mt-6 text-lg sm:text-xl md:text-2xl max-w-3xl mx-auto">
-          네스트마켓에서 더 좋은 가격으로, 더 즐겁게 구매하세요
+          둥지 마켓에서 더 좋은 가격으로, 더 즐겁게 구매하세요
         </p>
         <div className="mt-10">
           <Link
