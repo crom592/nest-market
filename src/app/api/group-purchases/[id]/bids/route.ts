@@ -1,19 +1,17 @@
-import { NextResponse, NextRequest } from 'next/server';
+// src/app/api/group-purchases/[id]/bids/route.ts
+
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
-type RouteParams = {
-  params: {
-    id: string;
-  };
-  searchParams?: { [key: string]: string | string[] | undefined };
-};
+export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: NextRequest,
-  context: RouteParams
-) {
+  { params }: { params: { id: string } }
+): Promise<NextResponse> {
+  const { id } = params;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -21,11 +19,15 @@ export async function GET(
     }
 
     const groupPurchase = await prisma.groupPurchase.findUnique({
-      where: { id: context.params.id },
+      where: { id },
       select: {
         status: true,
         auctionStartTime: true,
         auctionEndTime: true,
+        minPrice: true,
+        maxPrice: true,
+        currentParticipants: true,
+        minParticipants: true,
       },
     });
 
@@ -57,13 +59,14 @@ export async function GET(
 
     const bids = await prisma.bid.findMany({
       where: {
-        groupPurchaseId: context.params.id,
+        groupPurchaseId: id,
       },
       include: {
         seller: {
           select: {
             id: true,
             name: true,
+            email: true,
             rating: true,
             bidCount: true,
           },
@@ -86,8 +89,9 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  context: RouteParams
-) {
+  { params }: { params: { id: string } }
+): Promise<NextResponse> {
+  const { id } = params;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -96,11 +100,13 @@ export async function POST(
 
     const [groupPurchase, user] = await Promise.all([
       prisma.groupPurchase.findUnique({
-        where: { id: context.params.id },
+        where: { id },
         select: {
           status: true,
           auctionStartTime: true,
           auctionEndTime: true,
+          minPrice: true,
+          maxPrice: true,
           expectedPrice: true,
           _count: {
             select: {
@@ -112,6 +118,9 @@ export async function POST(
       prisma.user.findUnique({
         where: { id: session.user.id },
         select: {
+          id: true,
+          name: true,
+          email: true,
           role: true,
           points: true,
           rating: true,
@@ -125,6 +134,13 @@ export async function POST(
     if (!groupPurchase) {
       return NextResponse.json(
         { error: '공구를 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
+    if (!user) {
+      return NextResponse.json(
+        { error: '사용자 정보를 찾을 수 없습니다.' },
         { status: 404 }
       );
     }
@@ -149,13 +165,6 @@ export async function POST(
     }
 
     // Validate seller status
-    if (!user) {
-      return NextResponse.json(
-        { error: '사용자 정보를 찾을 수 없습니다.' },
-        { status: 404 }
-      );
-    }
-
     if (user.role !== 'SELLER') {
       return NextResponse.json(
         { error: '판매자만 입찰할 수 있습니다.' },
@@ -207,7 +216,7 @@ export async function POST(
     const existingBid = await prisma.bid.findFirst({
       where: {
         sellerId: session.user.id,
-        groupPurchaseId: context.params.id,
+        groupPurchaseId: id,
       },
     });
 
@@ -248,7 +257,7 @@ export async function POST(
           },
         });
 
-        return { 
+        return {
           bid: updatedBid,
           isNew: false,
           remainingPoints: updatedUser.points,
@@ -261,7 +270,7 @@ export async function POST(
           price,
           description,
           sellerId: session.user.id,
-          groupPurchaseId: context.params.id,
+          groupPurchaseId: id,
           status: 'PENDING',
         },
         include: {
@@ -279,7 +288,7 @@ export async function POST(
         },
       });
 
-      return { 
+      return {
         bid: newBid,
         isNew: true,
         remainingPoints: updatedUser.points,

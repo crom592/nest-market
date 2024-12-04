@@ -8,6 +8,9 @@ import Footer from '@/components/layout/Footer';
 export const metadata: Metadata = {
   title: '둥지마켓 - 소비자 주도형 공동구매 플랫폼',
   description: '소비자가 주도하는 혁신적인 공동구매 플랫폼',
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export default async function RootLayout({
