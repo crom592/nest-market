@@ -2,23 +2,50 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import GroupPurchaseList from '@/components/group-purchase/GroupPurchaseList';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import GroupPurchaseGrid from '@/components/group-purchase/GroupPurchaseGrid';
+import ParticipatingPurchases from '@/components/group-purchase/ParticipatingPurchases';
+import CompletedPurchases from '@/components/group-purchase/CompletedPurchases';
 import { GroupPurchase } from '@prisma/client';
 
+interface GroupPurchaseWithCounts extends GroupPurchase {
+  _count: {
+    participants: number;
+    bids: number;
+    votes: number;
+  };
+  creator: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+}
+
+interface PaginatedResponse {
+  groupPurchases: GroupPurchaseWithCounts[];
+  pagination: {
+    total: number;
+    pages: number;
+    page: number;
+    limit: number;
+  };
+}
+
 export default function GroupPurchasesPage() {
-  const [purchases, setPurchases] = useState<GroupPurchase[]>([]);
+  const [activeGroupPurchases, setActiveGroupPurchases] = useState<GroupPurchaseWithCounts[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchPurchases = async () => {
+    const fetchGroupPurchases = async () => {
       try {
         const response = await fetch('/api/group-purchases');
         if (!response.ok) {
           throw new Error('Failed to fetch group purchases');
         }
-        const data = await response.json();
-        setPurchases(data.groupPurchases);
+        const data: PaginatedResponse = await response.json();
+        setActiveGroupPurchases(data.groupPurchases);
       } catch (err) {
         setError(err instanceof Error ? err.message : '공구 목록을 불러오는데 실패했습니다.');
       } finally {
@@ -26,7 +53,7 @@ export default function GroupPurchasesPage() {
       }
     };
 
-    fetchPurchases();
+    fetchGroupPurchases();
   }, []);
 
   return (
@@ -52,7 +79,25 @@ export default function GroupPurchasesPage() {
           </button>
         </div>
       ) : (
-        <GroupPurchaseList purchases={purchases} isLoading={isLoading} />
+        <Tabs defaultValue="active" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="active">진행중인 공구</TabsTrigger>
+            <TabsTrigger value="participating">참여중인 공구</TabsTrigger>
+            <TabsTrigger value="completed">완료된 공구</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="active">
+            <GroupPurchaseGrid purchases={activeGroupPurchases} isLoading={isLoading} />
+          </TabsContent>
+
+          <TabsContent value="participating">
+            <ParticipatingPurchases />
+          </TabsContent>
+
+          <TabsContent value="completed">
+            <CompletedPurchases />
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   );

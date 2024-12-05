@@ -1,0 +1,287 @@
+export const mockGroupPurchases = [
+  {
+    id: '1',
+    name: 'Apple 맥북 프로 M3 Max',
+    description: '최신 M3 Max 칩셋 탑재, 32코어 GPU, 36GB 통합메모리',
+    mainImage: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    price: 3290000,
+    subsidy: 200000,
+    participantCount: 15,
+    maxParticipants: 20,
+    startTime: new Date('2024-02-01'),
+    endTime: new Date('2024-03-01'),
+    category: 'electronics',
+    isFavorited: false,
+    views: 1250,
+    status: 'active',
+    bids: [
+      { price: 3190000, subsidy: 200000, sellerId: 'S1', rating: 4.8 },
+      { price: 3200000, subsidy: 220000, sellerId: 'S2', rating: 4.5 },
+    ]
+  },
+  {
+    id: '2',
+    name: 'LG 그램 17인치 2024년형',
+    description: '초경량 노트북, 인텔 13세대 i7, 32GB RAM',
+    mainImage: 'https://images.unsplash.com/photo-1593642632823-8f785ba67e45?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    price: 2490000,
+    participantCount: 12,
+    maxParticipants: 15,
+    startTime: new Date('2024-02-05'),
+    endTime: new Date('2024-03-05'),
+    category: 'electronics',
+    isFavorited: true,
+    views: 980,
+    status: 'active',
+    bids: [
+      { price: 2390000, subsidy: 0, sellerId: 'S3', rating: 4.9 },
+      { price: 2450000, subsidy: 0, sellerId: 'S4', rating: 4.7 },
+    ]
+  },
+  {
+    id: '3',
+    name: '다이슨 V15 무선청소기',
+    description: '최신형 무선청소기, 강력한 흡입력',
+    mainImage: 'https://images.unsplash.com/photo-1558317374-067fb5f30001?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    price: 890000,
+    subsidy: 50000,
+    participantCount: 25,
+    maxParticipants: 30,
+    startTime: new Date('2024-02-10'),
+    endTime: new Date('2024-03-10'),
+    category: 'electronics',
+    isFavorited: false,
+    views: 1500,
+    status: 'active',
+    bids: [
+      { price: 850000, subsidy: 50000, sellerId: 'S5', rating: 4.6 },
+      { price: 870000, subsidy: 60000, sellerId: 'S6', rating: 4.8 },
+    ]
+  },
+  {
+    id: '4',
+    name: '나이키 에어맥스 2024',
+    description: '최신형 러닝화, 혁신적인 쿠셔닝',
+    mainImage: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    price: 189000,
+    participantCount: 45,
+    maxParticipants: 50,
+    startTime: new Date('2024-02-15'),
+    endTime: new Date('2024-03-15'),
+    category: 'fashion',
+    isFavorited: true,
+    views: 2200,
+    status: 'active',
+    bids: [
+      { price: 179000, subsidy: 0, sellerId: 'S7', rating: 4.7 },
+      { price: 185000, subsidy: 0, sellerId: 'S8', rating: 4.5 },
+    ]
+  },
+  {
+    id: '5',
+    name: '삼성 QLED 4K TV 75인치',
+    description: '퀀텀 프로세서 탑재, 초고화질 화면',
+    mainImage: 'https://images.unsplash.com/photo-1593784991095-a205069470b6?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    price: 2890000,
+    subsidy: 150000,
+    participantCount: 8,
+    maxParticipants: 10,
+    startTime: new Date('2024-02-20'),
+    endTime: new Date('2024-03-20'),
+    category: 'electronics',
+    isFavorited: false,
+    views: 850,
+    status: 'active',
+    bids: [
+      { price: 2790000, subsidy: 150000, sellerId: 'S9', rating: 4.9 },
+      { price: 2850000, subsidy: 170000, sellerId: 'S10', rating: 4.6 },
+    ]
+  }
+];
+
+export const mockParticipatingPurchases = [
+  {
+    id: '6',
+    name: '애플워치 9 GPS',
+    description: '최신 건강 모니터링, 향상된 배터리',
+    mainImage: 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    price: 590000,
+    participantCount: 18,
+    maxParticipants: 20,
+    startTime: new Date('2024-02-01'),
+    endTime: new Date('2024-02-28'),
+    category: 'electronics',
+    status: 'active',
+    bids: [
+      { price: 580000, subsidy: 0, sellerId: 'S11', rating: 4.8 },
+      { price: 585000, subsidy: 0, sellerId: 'S12', rating: 4.7 },
+      { price: 588000, subsidy: 0, sellerId: 'S13', rating: 4.9 },
+    ],
+    bidRanking: [
+      { rank: 1, price: 580000, rating: 4.8 },
+      { rank: 2, price: 585000, rating: 4.7 },
+      { rank: 3, price: 588000, rating: 4.9 },
+    ]
+  },
+  {
+    id: '7',
+    name: '필립스 에어프라이어 XXL',
+    description: '대용량 에어프라이어, 스마트 센싱',
+    mainImage: 'https://images.unsplash.com/photo-1585515320310-259814833e62?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    price: 299000,
+    subsidy: 30000,
+    participantCount: 25,
+    maxParticipants: 30,
+    startTime: new Date('2024-02-05'),
+    endTime: new Date('2024-03-05'),
+    category: 'electronics',
+    status: 'active',
+    bids: [
+      { price: 289000, subsidy: 30000, sellerId: 'S14', rating: 4.6 },
+      { price: 292000, subsidy: 35000, sellerId: 'S15', rating: 4.8 },
+      { price: 295000, subsidy: 40000, sellerId: 'S16', rating: 4.7 },
+    ],
+    bidRanking: [
+      { rank: 1, price: 289000, subsidy: 30000, rating: 4.6 },
+      { rank: 2, price: 292000, subsidy: 35000, rating: 4.8 },
+      { rank: 3, price: 295000, subsidy: 40000, rating: 4.7 },
+    ]
+  },
+  {
+    id: '8',
+    name: '샤넬 클래식 미디엄 플랩백',
+    description: '티타늄 하드웨어, 램스킨 레더',
+    mainImage: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    price: 12900000,
+    participantCount: 5,
+    maxParticipants: 5,
+    startTime: new Date('2024-02-10'),
+    endTime: new Date('2024-03-10'),
+    category: 'fashion',
+    status: 'active',
+    bids: [
+      { price: 12800000, subsidy: 0, sellerId: 'S17', rating: 5.0 },
+      { price: 12850000, subsidy: 0, sellerId: 'S18', rating: 4.9 },
+    ],
+    bidRanking: [
+      { rank: 1, price: 12800000, rating: 5.0 },
+      { rank: 2, price: 12850000, rating: 4.9 },
+    ]
+  },
+  {
+    id: '9',
+    name: '다이슨 에어랩 컴플리트',
+    description: '신형 스타일링 키트, 향상된 성능',
+    mainImage: 'https://images.unsplash.com/photo-1522338242992-e1a54906a8da?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    price: 699000,
+    subsidy: 40000,
+    participantCount: 35,
+    maxParticipants: 40,
+    startTime: new Date('2024-02-15'),
+    endTime: new Date('2024-03-15'),
+    category: 'beauty',
+    status: 'active',
+    bids: [
+      { price: 689000, subsidy: 40000, sellerId: 'S19', rating: 4.7 },
+      { price: 692000, subsidy: 45000, sellerId: 'S20', rating: 4.8 },
+    ],
+    bidRanking: [
+      { rank: 1, price: 689000, subsidy: 40000, rating: 4.7 },
+      { rank: 2, price: 692000, subsidy: 45000, rating: 4.8 },
+    ]
+  },
+  {
+    id: '10',
+    name: '소니 WH-1000XM5 헤드폰',
+    description: '최고급 노이즈 캔슬링, 30시간 재생',
+    mainImage: 'https://images.unsplash.com/photo-1583394838336-acd977736f90?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    price: 429000,
+    participantCount: 28,
+    maxParticipants: 30,
+    startTime: new Date('2024-02-20'),
+    endTime: new Date('2024-03-20'),
+    category: 'electronics',
+    status: 'active',
+    bids: [
+      { price: 419000, subsidy: 0, sellerId: 'S21', rating: 4.8 },
+      { price: 422000, subsidy: 0, sellerId: 'S22', rating: 4.9 },
+      { price: 425000, subsidy: 0, sellerId: 'S23', rating: 4.7 },
+    ],
+    bidRanking: [
+      { rank: 1, price: 419000, rating: 4.8 },
+      { rank: 2, price: 422000, rating: 4.9 },
+      { rank: 3, price: 425000, rating: 4.7 },
+    ]
+  }
+];
+
+export const mockCompletedPurchases = [
+  {
+    id: '11',
+    name: '아이패드 프로 12.9인치',
+    description: 'M2 칩셋, 미니 LED 디스플레이',
+    mainImage: 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    finalPrice: 1390000,
+    finalSubsidy: 100000,
+    participantCount: 25,
+    completedAt: new Date('2024-01-15'),
+    category: 'electronics',
+    status: 'completed',
+    rating: 4.8,
+    review: '배송이 빠르고 상품 상태가 매우 좋았습니다. 공구 진행도 순조로웠어요!'
+  },
+  {
+    id: '12',
+    name: '발뮤다 토스터',
+    description: '스팀 테크놀로지, 5가지 모드',
+    mainImage: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    finalPrice: 289000,
+    finalSubsidy: 20000,
+    participantCount: 15,
+    completedAt: new Date('2024-01-20'),
+    category: 'electronics',
+    status: 'completed',
+    rating: 4.9,
+    review: '역시 발뮤다! 토스트가 정말 맛있게 구워져요. 공구로 저렴하게 구매해서 좋았습니다.'
+  },
+  {
+    id: '13',
+    name: '구찌 마몬트 숄더백',
+    description: '마틀라세 가죽, 골드 하드웨어',
+    mainImage: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    finalPrice: 2190000,
+    participantCount: 8,
+    completedAt: new Date('2024-01-25'),
+    category: 'fashion',
+    status: 'completed',
+    rating: 4.7,
+    review: '정품 인증서까지 꼼꼼하게 챙겨주셔서 감사합니다. 가방 퀄리티도 최고예요!'
+  },
+  {
+    id: '14',
+    name: '루이비통 네버풀 MM',
+    description: '모노그램 캔버스, 클래식 디자인',
+    mainImage: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    finalPrice: 1890000,
+    participantCount: 10,
+    completedAt: new Date('2024-02-01'),
+    category: 'fashion',
+    status: 'completed',
+    rating: 4.9,
+    review: '공구 진행이 너무 투명하고 깔끔했어요. 정품 보증서와 더스트백까지 완벽!'
+  },
+  {
+    id: '15',
+    name: '삼성 비스포크 냉장고',
+    description: '4도어, 푸드쇼케이스, 김치플러스',
+    mainImage: 'https://images.unsplash.com/photo-1584568694244-14fbdf83bd30?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    finalPrice: 2890000,
+    finalSubsidy: 200000,
+    participantCount: 12,
+    completedAt: new Date('2024-02-05'),
+    category: 'electronics',
+    status: 'completed',
+    rating: 4.8,
+    review: '배송부터 설치까지 완벽했습니다. 지원금도 잘 받았고 가격도 저렴해서 대만족!'
+  }
+];

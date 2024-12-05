@@ -162,8 +162,19 @@ export async function GET(request: NextRequest) {
       prisma.groupPurchase.count({ where }),
     ]);
 
+    // Serialize dates to ISO strings
+    const serializedPurchases = groupPurchases.map(purchase => ({
+      ...purchase,
+      createdAt: purchase.createdAt.toISOString(),
+      updatedAt: purchase.updatedAt.toISOString(),
+      auctionStartTime: purchase.auctionStartTime?.toISOString() || null,
+      auctionEndTime: purchase.auctionEndTime?.toISOString() || null,
+      voteStartTime: purchase.voteStartTime?.toISOString() || null,
+      voteEndTime: purchase.voteEndTime?.toISOString() || null,
+    }));
+
     const response = {
-      groupPurchases,
+      groupPurchases: serializedPurchases,
       pagination: {
         total,
         pages: Math.ceil(total / limit),

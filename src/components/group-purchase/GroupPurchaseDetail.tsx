@@ -11,6 +11,18 @@ import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import BidForm from './BidForm';
 import ChatRoom from './ChatRoom';
+import { Share2, Heart, Trash2, Edit2 } from 'lucide-react';
+import { Dialog } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface ExtendedBid extends Bid {
   seller: User & {
@@ -71,6 +83,83 @@ export default function GroupPurchaseDetail({
   const [isParticipant, setIsParticipant] = useState(initialIsParticipant);
   const [hasVoted, setHasVoted] = useState(initialHasVoted);
   const [timeLeft, setTimeLeft] = useState<string>('');
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showPenaltyDialog, setShowPenaltyDialog] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  const isLeader = session?.user?.id === initialGroupPurchase.creator.id;
+  const canDelete = isLeader && initialGroupPurchase.participants.length <= 1;
+  const canEdit = isLeader && initialGroupPurchase.participants.length <= 1;
+
+  const handleShare = async () => {
+    const shareData = {
+      title: initialGroupPurchase.title,
+      text: `${initialGroupPurchase.title} 공구에 참여해보세요!`,
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        // Fallback for browsers that don't support Web Share API
+        const platforms = [
+          { name: 'KakaoTalk', url: `https://story.kakao.com/share?url=${encodeURIComponent(window.location.href)}` },
+          { name: 'Twitter', url: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareData.text)}&url=${encodeURIComponent(window.location.href)}` },
+          { name: 'Facebook', url: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}` },
+        ];
+        
+        // Show sharing dialog with platform options
+        // Implementation details...
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+      toast.error('공유하기에 실패했습니다.');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!canDelete) {
+      toast.error('참여자가 있어 삭제할 수 없습니다.');
+      return;
+    }
+
+    try {
+      await fetch(`/api/group-purchases/${initialGroupPurchase.id}`, {
+        method: 'DELETE',
+      });
+      toast.success('공구가 삭제되었습니다.');
+      // Redirect to list page
+      window.location.href = '/group-purchases';
+    } catch (error) {
+      console.error('Error deleting group purchase:', error);
+      toast.error('삭제에 실패했습니다.');
+    }
+  };
+
+  const handleParticipate = async () => {
+    setShowPenaltyDialog(true);
+  };
+
+  const confirmParticipation = async () => {
+    try {
+      const response = await fetch(`/api/group-purchases/${initialGroupPurchase.id}/participate`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to participate');
+      }
+
+      toast.success('공구 참여가 완료되었습니다.');
+      // Refresh the page to update the UI
+      window.location.reload();
+    } catch (error) {
+      console.error('Error participating in group purchase:', error);
+      toast.error('참여에 실패했습니다.');
+    }
+  };
 
   // Timer for auction/vote end time
   useEffect(() => {
@@ -100,62 +189,6 @@ export default function GroupPurchaseDetail({
 
     return () => clearInterval(timer);
   }, [groupPurchase?.status, groupPurchase?.auctionEndTime, groupPurchase?.voteEndTime]);
-
-  const handleParticipate = async () => {
-    if (!session?.user) {
-      toast.error('로그인이 필요합니다.');
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/group-purchases/${groupPurchase.id}/participate`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || '참여에 실패했습니다.');
-      }
-
-      const data = await response.json();
-      setGroupPurchase(data.groupPurchase);
-      setIsParticipant(true);
-      toast.success('공구에 참여했습니다!');
-    } catch (error) {
-      console.error('Failed to participate:', error);
-      toast.error(error instanceof Error ? error.message : '참여 중 오류가 발생했습니다.');
-    }
-  };
-
-  const handleVote = async (approved: boolean) => {
-    if (!session?.user) {
-      toast.error('로그인이 필요합니다.');
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/group-purchases/${groupPurchase.id}/vote`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ approved }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || '투표에 실패했습니다.');
-      }
-
-      const data = await response.json();
-      setGroupPurchase(data.groupPurchase);
-      setHasVoted(true);
-      toast.success('투표가 완료되었습니다!');
-    } catch (error) {
-      console.error('Failed to vote:', error);
-      toast.error(error instanceof Error ? error.message : '투표 중 오류가 발생했습니다.');
-    }
-  };
 
   const renderStatus = () => {
     const status = STATUS_MAP[groupPurchase.status];
@@ -231,89 +264,163 @@ export default function GroupPurchaseDetail({
   };
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
+    <div className="max-w-4xl mx-auto p-6">
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="flex justify-between items-start mb-6">
           <h1 className="text-2xl font-bold">{groupPurchase.title}</h1>
-          {renderStatus()}
-        </div>
-        
-        <div className="flex items-center space-x-2 text-sm text-gray-500">
-          <span>작성자: {groupPurchase.creator.name}</span>
-          <span>•</span>
-          <span>
-            {formatDistanceToNow(new Date(groupPurchase.createdAt), {
-              addSuffix: true,
-              locale: ko,
-            })}
-          </span>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="icon" onClick={() => setIsFavorite(!isFavorite)}>
+              <Heart className={isFavorite ? 'fill-red-500 text-red-500' : ''} />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleShare}>
+              <Share2 />
+            </Button>
+            {isLeader && (
+              <>
+                {canEdit && (
+                  <Button variant="ghost" size="icon" onClick={() => setIsEditing(true)}>
+                    <Edit2 />
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button variant="ghost" size="icon" onClick={() => setShowDeleteDialog(true)}>
+                    <Trash2 className="text-red-500" />
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
-        <p className="text-gray-700 whitespace-pre-line">{groupPurchase.description}</p>
-
-        {timeLeft && (
-          <p className="text-lg font-semibold text-center">
-            {groupPurchase.status === 'VOTING' ? '투표' : '입찰'} 종료까지: {timeLeft}
+        <div className="mb-6">
+          <Progress 
+            value={
+              ((new Date().getTime() - new Date(groupPurchase.startTime).getTime()) /
+              (new Date(groupPurchase.endTime).getTime() - new Date(groupPurchase.startTime).getTime())) * 100
+            } 
+          />
+          <p className="text-sm text-gray-500 mt-2">
+            {formatDistanceToNow(new Date(groupPurchase.endTime), { addSuffix: true, locale: ko })}
           </p>
-        )}
+        </div>
 
-        {renderParticipationProgress()}
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold mb-2">참여자 ({groupPurchase.participants.length}명)</h2>
+          <div className="flex flex-wrap gap-2">
+            {groupPurchase.participants.map(({ user }) => (
+              <div key={user.id} className="flex items-center gap-1">
+                <Badge variant={user.role === 'SELLER' ? 'secondary' : 'default'}>
+                  {user.name}
+                  {user.role === 'SELLER' && ' '}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {canParticipate && (
           <Button
-            onClick={handleParticipate}
             className="w-full"
+            onClick={handleParticipate}
           >
-            참여하기
+            공구 참여하기
           </Button>
         )}
-      </div>
 
-      {groupPurchase.status === 'BIDDING' && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold">입찰 현황</h2>
-          {renderBids()}
-          {canBid && <BidForm groupPurchaseId={groupPurchase.id} onBidSubmitted={(bid) => {
-            setGroupPurchase(prev => ({
-              ...prev,
-              bids: [...prev.bids, bid],
-            }));
-          }} />}
-        </div>
-      )}
-
-      {groupPurchase.status === 'VOTING' && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold">투표</h2>
-          {renderVotingStatus()}
-          {canVote && !hasVoted && (
-            <div className="flex space-x-4">
-              <Button
-                onClick={() => handleVote(true)}
-                className="flex-1 bg-green-500 hover:bg-green-600"
-              >
-                찬성
+        <Dialog
+          open={showPenaltyDialog}
+          onOpenChange={setShowPenaltyDialog}
+        >
+          <div className="p-6">
+            <h2 className="text-lg font-semibold mb-4">공구 참여 전 확인사항</h2>
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-medium">패널티 정책</h3>
+                <ul className="list-disc pl-5 text-sm text-gray-600">
+                  <li>입찰건이 1건 이상일 경우 탈퇴 시 패널티가 부과됩니다.</li>
+                  <li>공구 최종 진행 결정 후 노쇼 시 패널티가 부과됩니다.</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-medium">패널티 내용</h3>
+                <ul className="list-disc pl-5 text-sm text-gray-600">
+                  <li>공구 참여 제한 (7일)</li>
+                  <li>평가 점수 감점</li>
+                </ul>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowPenaltyDialog(false)}>
+                취소
               </Button>
-              <Button
-                onClick={() => handleVote(false)}
-                className="flex-1 bg-red-500 hover:bg-red-600"
-              >
-                반대
+              <Button onClick={confirmParticipation}>
+                동의 후 참여하기
               </Button>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        </Dialog>
 
-      {isParticipant && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold">채팅</h2>
-          <ChatRoom
-            groupPurchaseId={groupPurchase.id}
-            initialMessages={groupPurchase.messages}
-          />
-        </div>
-      )}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>공구를 삭제하시겠습니까?</AlertDialogTitle>
+              <AlertDialogDescription>
+                이 작업은 되돌릴 수 없습니다.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>취소</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete}>삭제</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {groupPurchase.status === 'BIDDING' && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">입찰 현황</h2>
+            {renderBids()}
+            {canBid && <BidForm groupPurchaseId={groupPurchase.id} onBidSubmitted={(bid) => {
+              setGroupPurchase(prev => ({
+                ...prev,
+                bids: [...prev.bids, bid],
+              }));
+            }} />}
+          </div>
+        )}
+
+        {groupPurchase.status === 'VOTING' && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">투표</h2>
+            {renderVotingStatus()}
+            {canVote && !hasVoted && (
+              <div className="flex space-x-4">
+                <Button
+                  onClick={() => handleVote(true)}
+                  className="flex-1 bg-green-500 hover:bg-green-600"
+                >
+                  찬성
+                </Button>
+                <Button
+                  onClick={() => handleVote(false)}
+                  className="flex-1 bg-red-500 hover:bg-red-600"
+                >
+                  반대
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {isParticipant && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">채팅</h2>
+            <ChatRoom
+              groupPurchaseId={groupPurchase.id}
+              initialMessages={groupPurchase.messages}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

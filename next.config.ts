@@ -5,7 +5,10 @@ import type { NextConfig } from "next";
 /** @type {NextConfig} */
 const nextConfig: NextConfig = {
   images: {
-    domains: ["images.unsplash.com"], // Add other domains as needed
+    domains: [
+      "images.unsplash.com",
+      "via.placeholder.com"
+    ],
   },
   eslint: {
     // Warning: This allows production builds to successfully complete even if

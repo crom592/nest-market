@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import UserManagement from '@/components/admin/UserManagement';
+import GroupPurchaseManagement from '@/components/admin/GroupPurchaseManagement';
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
@@ -39,7 +41,11 @@ export default function AdminPage() {
   }, [session, status, router]);
 
   if (status === 'loading') {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
   }
 
   if (!session?.user || session.user.role !== 'ADMIN') {
@@ -89,43 +95,26 @@ export default function AdminPage() {
       </div>
 
       <Tabs defaultValue="users" className="space-y-4">
-        <TabsList>
+        <TabsList className="bg-muted/50 p-1">
           <TabsTrigger value="users">사용자 관리</TabsTrigger>
           <TabsTrigger value="purchases">공구 관리</TabsTrigger>
           <TabsTrigger value="reports">신고 관리</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="users" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>사용자 목록</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {/* Add user management table/list here */}
-              <div className="text-gray-500">사용자 관리 기능 개발 중...</div>
-            </CardContent>
-          </Card>
+        <TabsContent value="users">
+          <UserManagement />
         </TabsContent>
 
-        <TabsContent value="purchases" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>공구 목록</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {/* Add group purchase management table/list here */}
-              <div className="text-gray-500">공구 관리 기능 개발 중...</div>
-            </CardContent>
-          </Card>
+        <TabsContent value="purchases">
+          <GroupPurchaseManagement />
         </TabsContent>
 
-        <TabsContent value="reports" className="space-y-4">
+        <TabsContent value="reports">
           <Card>
             <CardHeader>
               <CardTitle>신고 목록</CardTitle>
             </CardHeader>
             <CardContent>
-              {/* Add report management table/list here */}
               <div className="text-gray-500">신고 관리 기능 개발 중...</div>
             </CardContent>
           </Card>

@@ -1,40 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { toast } from 'react-toastify';
-import { motion } from 'framer-motion';
+import ProductSearch from './ProductSearch';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { motion } from 'framer-motion';
 import { Loader2 } from "lucide-react";
-
-interface CreateGroupPurchaseFormData {
-  title: string;
-  description: string;
-  minParticipants: number;
-  maxParticipants: number;
-  expectedPrice: number;
-  auctionDuration: number; // 시간 단위
-}
 
 const formVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -48,59 +34,109 @@ const formVariants = {
   }
 };
 
+const formSchema = z.object({
+  title: z.string().min(1, '제품/서비스 이름을 입력해주세요'),
+  description: z.string().min(1, '제품/서비스 내용을 입력해주세요'),
+  category: z.string().min(1, '카테고리를 선택해주세요'),
+  bidType: z.enum(['PRICE_ONLY', 'PRICE_AND_SUPPORT']),
+  startPrice: z.number().min(0, '시작 가격은 0 이상이어야 합니다'),
+  supportAmount: z.number().optional(),
+  startTime: z.string(),
+  endTime: z.string(),
+  maxParticipants: z.number().min(2, '최소 2명 이상의 참여자가 필요합니다'),
+  imageUrl: z.string().optional(),
+  minParticipants: z.number().min(2, '최소 2명 이상이어야 합니다'),
+  expectedPrice: z.number().min(1000, '1,000원 이상이어야 합니다').max(100000000, '1억원 이하여야 합니다'),
+  auctionDuration: z.number().min(24, '최소 24시간 이상이어야 합니다'),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
+const AUTOSAVE_DELAY = 1000; // 1초
+
 export default function CreateGroupPurchaseForm() {
   const router = useRouter();
-  const { data: session } = useSession();
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const form = useForm<CreateGroupPurchaseFormData>({
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
-      title: '',
-      description: '',
+      bidType: 'PRICE_ONLY',
+      maxParticipants: 2,
       minParticipants: 2,
-      maxParticipants: 10,
-      expectedPrice: 0,
       auctionDuration: 24,
     },
-    mode: 'onChange',
   });
 
-  const minParticipants = form.watch('minParticipants');
+  // 자동 저장된 데이터 불러오기
+  useEffect(() => {
+    const savedData = localStorage.getItem('groupPurchaseFormDraft');
+    if (savedData) {
+      try {
+        const parsedData = JSON.parse(savedData);
+        form.reset(parsedData);
+      } catch (error) {
+        console.error('Failed to load saved form data:', error);
+      }
+    }
+  }, []);
 
-  const onSubmit = async (data: CreateGroupPurchaseFormData) => {
-    if (!session?.user) {
-      toast.error('로그인이 필요합니다.');
+  // 폼 데이터 변경 시 자동 저장
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+      const saveTimer = setTimeout(() => {
+        localStorage.setItem('groupPurchaseFormDraft', JSON.stringify(value));
+        setIsSaving(false);
+      }, AUTOSAVE_DELAY);
+
+      setIsSaving(true);
+      return () => clearTimeout(saveTimer);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [form.watch]);
+
+  const onSubmit = async (values: FormValues) => {
+    if (!values.title || !values.description || !values.category) {
+      toast.error('제품/서비스 정보를 입력해주세요.');
       return;
     }
 
     try {
       setIsSubmitting(true);
-      const auctionStartTime = new Date();
-      const auctionEndTime = new Date(auctionStartTime.getTime() + data.auctionDuration * 60 * 60 * 1000);
-
       const response = await fetch('/api/group-purchases', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...data,
-          auctionStartTime,
-          auctionEndTime,
-        }),
+        body: JSON.stringify(values),
       });
 
       if (!response.ok) {
-        throw new Error('공구 생성에 실패했습니다.');
+        throw new Error('공구 등록에 실패했습니다.');
       }
 
-      const result = await response.json();
-      toast.success('공구가 생성되었습니다!');
-      router.push(`/group-purchases/${result.groupPurchase.id}`);
+      // 등록 성공 시 자동 저장 데이터 삭제
+      localStorage.removeItem('groupPurchaseFormDraft');
+      
+      toast.success('공구가 등록되었습니다!');
+      router.push('/group-purchases');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '공구 생성에 실패했습니다.');
+      console.error('Failed to create group purchase:', error);
+      toast.error(error instanceof Error ? error.message : '등록 중 오류가 발생했습니다.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleProductSelect = (product: any) => {
+    setSelectedProduct(product);
+    form.setValue('title', product.name);
+    form.setValue('category', product.category);
+    if (product.imageUrl) {
+      form.setValue('imageUrl', product.imageUrl);
     }
   };
 
@@ -113,23 +149,20 @@ export default function CreateGroupPurchaseForm() {
     >
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <div className="space-y-2">
+            <FormLabel>제품/서비스 검색</FormLabel>
+            <ProductSearch onSelect={handleProductSelect} />
+          </div>
+
           <FormField
             control={form.control}
             name="title"
-            rules={{ required: '제목을 입력해주세요.' }}
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-base">제목</FormLabel>
+                <FormLabel>제품/서비스 이름 *</FormLabel>
                 <FormControl>
-                  <Input 
-                    placeholder="공동구매 제목을 입력해주세요" 
-                    className="h-11"
-                    {...field} 
-                  />
+                  <Input {...field} />
                 </FormControl>
-                <FormDescription className="text-sm text-gray-500">
-                  원하시는 상품이나 서비스를 명확하게 표현해주세요.
-                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -138,20 +171,12 @@ export default function CreateGroupPurchaseForm() {
           <FormField
             control={form.control}
             name="description"
-            rules={{ required: '상세 설명을 입력해주세요.' }}
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-base">상세 설명</FormLabel>
+                <FormLabel>제품/서비스 내용 *</FormLabel>
                 <FormControl>
-                  <Textarea
-                    placeholder="원하시는 상품이나 서비스에 대해 자세히 설명해주세요"
-                    className="min-h-[150px] resize-none"
-                    {...field}
-                  />
+                  <Textarea {...field} />
                 </FormControl>
-                <FormDescription className="text-sm text-gray-500">
-                  상품의 스펙, 원하는 조건 등을 상세히 적어주세요.
-                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -159,62 +184,123 @@ export default function CreateGroupPurchaseForm() {
 
           <FormField
             control={form.control}
-            name="expectedPrice"
-            rules={{ 
-              required: '예상 가격을 입력해주세요.',
-              min: { value: 1000, message: '1,000원 이상이어야 합니다.' },
-              max: { value: 100000000, message: '1억원 이하여야 합니다.' },
-              validate: {
-                isNumber: (value) => !isNaN(value) || '올바른 숫자를 입력해주세요.',
-              }
-            }}
+            name="bidType"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-base">예상 가격</FormLabel>
+                <FormLabel>입찰 방식 *</FormLabel>
                 <FormControl>
-                  <Input
-                    type="number"
-                    placeholder="50000"
-                    className="h-11"
-                    {...field}
-                    onChange={e => field.onChange(e.target.valueAsNumber)}
-                  />
+                  <RadioGroup
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    className="flex flex-col space-y-1"
+                  >
+                    <FormItem className="flex items-center space-x-3 space-y-0">
+                      <FormControl>
+                        <RadioGroupItem value="PRICE_ONLY" />
+                      </FormControl>
+                      <FormLabel className="font-normal">
+                        가격만
+                      </FormLabel>
+                    </FormItem>
+                    <FormItem className="flex items-center space-x-3 space-y-0">
+                      <FormControl>
+                        <RadioGroupItem value="PRICE_AND_SUPPORT" />
+                      </FormControl>
+                      <FormLabel className="font-normal">
+                        가격 + 지원금
+                      </FormLabel>
+                    </FormItem>
+                  </RadioGroup>
                 </FormControl>
-                <FormDescription className="text-sm text-gray-500">
-                  원하시는 가격대를 입력해주세요.
-                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid gap-4 md:grid-cols-2">
             <FormField
               control={form.control}
-              name="minParticipants"
-              rules={{ 
-                required: '최소 참여자 수를 입력해주세요.',
-                min: { value: 2, message: '최소 2명 이상이어야 합니다.' },
-                max: { value: 100, message: '최대 100명까지 가능합니다.' },
-                validate: {
-                  isNumber: (value) => !isNaN(value) || '올바른 숫자를 입력해주세요.',
-                }
-              }}
+              name="startPrice"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-base">최소 참여자 수</FormLabel>
+                  <FormLabel>시작 가격 *</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
-                      placeholder="2"
-                      className="h-11"
                       {...field}
-                      onChange={e => field.onChange(e.target.valueAsNumber)}
+                      onChange={(e) => field.onChange(Number(e.target.value))}
                     />
                   </FormControl>
-                  <FormDescription className="text-sm text-gray-500">
-                    공구가 성사되기 위한 최소 인원수입니다.
-                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {form.watch('bidType') === 'PRICE_AND_SUPPORT' && (
+              <FormField
+                control={form.control}
+                name="supportAmount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>지원금</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="startTime"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>시작 시간 *</FormLabel>
+                  <FormControl>
+                    <Input type="datetime-local" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="endTime"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>종료 시간 *</FormLabel>
+                  <FormControl>
+                    <Input type="datetime-local" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="minParticipants"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>최소 참여자 수 *</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      {...field}
+                      onChange={(e) => field.onChange(Number(e.target.value))}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -223,38 +309,16 @@ export default function CreateGroupPurchaseForm() {
             <FormField
               control={form.control}
               name="maxParticipants"
-              rules={{ 
-                required: '최대 참여자 수를 입력해주세요.',
-                min: { 
-                  value: 2,
-                  message: '최소 2명 이상이어야 합니다.'
-                },
-                max: { 
-                  value: 100,
-                  message: '최대 100명까지 가능합니다.'
-                },
-                validate: {
-                  isGreaterThanMin: (value) => 
-                    value > minParticipants || 
-                    '최대 참여자 수는 최소 참여자 수보다 커야 합니다.',
-                  isNumber: (value) => !isNaN(value) || '올바른 숫자를 입력해주세요.',
-                }
-              }}
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-base">최대 참여자 수</FormLabel>
+                  <FormLabel>최대 참여자 수 *</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
-                      placeholder="10"
-                      className="h-11"
                       {...field}
-                      onChange={e => field.onChange(e.target.valueAsNumber)}
+                      onChange={(e) => field.onChange(Number(e.target.value))}
                     />
                   </FormControl>
-                  <FormDescription className="text-sm text-gray-500">
-                    공구에 참여할 수 있는 최대 인원수입니다.
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -263,52 +327,52 @@ export default function CreateGroupPurchaseForm() {
 
           <FormField
             control={form.control}
-            name="auctionDuration"
-            rules={{ required: '입찰 기간을 선택해주세요.' }}
+            name="expectedPrice"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-base">입찰 기간</FormLabel>
-                <Select
-                  onValueChange={val => field.onChange(parseInt(val))}
-                  defaultValue={field.value.toString()}
-                >
-                  <FormControl>
-                    <SelectTrigger className="h-11">
-                      <SelectValue placeholder="입찰 기간을 선택해주세요" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="24">24시간</SelectItem>
-                    <SelectItem value="48">48시간</SelectItem>
-                    <SelectItem value="72">72시간</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormDescription className="text-sm text-gray-500">
-                  판매자들이 입찰할 수 있는 기간입니다.
-                </FormDescription>
+                <FormLabel>예상 가격 *</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    {...field}
+                    onChange={(e) => field.onChange(Number(e.target.value))}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
 
-          <div className="flex justify-end space-x-4 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.back()}
-              className="h-11 px-6"
-            >
-              취소
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={isSubmitting}
-              className="h-11 px-6 bg-primary hover:bg-primary-dark"
-            >
+          <FormField
+            control={form.control}
+            name="auctionDuration"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>입찰 기간 *</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    {...field}
+                    onChange={(e) => field.onChange(Number(e.target.value))}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <div className="flex justify-between items-center">
+            <Button type="submit" disabled={isSubmitting} className="w-full">
               {isSubmitting && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-              공구 만들기
+              공구 등록하기
             </Button>
           </div>
+
+          {isSaving && (
+            <p className="text-sm text-gray-500 text-center">
+              임시 저장 중...
+            </p>
+          )}
         </form>
       </Form>
     </motion.div>

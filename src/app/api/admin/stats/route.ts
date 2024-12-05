@@ -23,20 +23,13 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Get stats
-    const [
-      totalUsers,
-      totalGroupPurchases,
-      activeGroupPurchases,
-      totalBids,
-    ] = await Promise.all([
+    // Get statistics
+    const [totalUsers, totalGroupPurchases, activeGroupPurchases, totalBids] = await Promise.all([
       prisma.user.count(),
       prisma.groupPurchase.count(),
       prisma.groupPurchase.count({
         where: {
-          status: {
-            in: ['PENDING', 'ACTIVE', 'BIDDING'],
-          },
+          status: 'ACTIVE',
         },
       }),
       prisma.bid.count(),

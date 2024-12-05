@@ -111,7 +111,7 @@ model GroupPurchase {
   title       String   // 공구 제목
   description String   // 상세 설명
   imageUrl    String?  // 이미지
-  
+  targetPrice Float    // 목표 가격
   // 모집 관련
   minParticipants Int  // 최소 참여자 수
   maxParticipants Int  // 최대 참여자 수
