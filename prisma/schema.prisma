@@ -14,6 +14,20 @@ enum UserRole {
   CONSUMER // 참새
   SELLER  // 어미새
   ADMIN
+  USER
+}
+
+enum UserLevel {
+  BEGINNER_SPARROW
+  GOOD_SPARROW
+  BEST_SPARROW
+  LEADER_SPARROW
+  VIP_SPARROW
+  BEGINNER_MOTHER_BIRD
+  GOOD_MOTHER_BIRD
+  BEST_MOTHER_BIRD
+  LEADER_MOTHER_BIRD
+  VIP_MOTHER_BIRD
 }
 
 enum PurchaseStatus {
@@ -78,29 +92,30 @@ model User {
   emailVerified DateTime?
   image         String?
   password      String?
-  role          UserRole  @default(CONSUMER)
+  role          UserRole  @default(USER)
+  level         UserLevel @default(BEGINNER_SPARROW)
+  nickname      String?
   phone         String?
+  businessNumber String?  @unique
+  businessLicense String?
+  participationCount Int @default(0)
+  penaltyCount Int @default(0)
+  penaltyEndTime DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-
-  // 패널티 관련
-  penaltyCount    Int       @default(0)
-  penaltyEndTime  DateTime?
-  lastParticipation DateTime?
-
-  // 판매자 관련
+  accounts      Account[]
+  sessions      Session[]
+  groupPurchases GroupPurchase[] @relation("Creator")
+  participations Participation[]
+  notifications Notification[]
+  votes         Vote[]
+  reviews       Review[]
+  inquiries     Inquiry[]
   points        Int     @default(0)  // 입찰 포인트
   bidCount      Int     @default(0)  // 입찰 횟수
   rating        Float?  // 평점
-
-  // 관계
-  groupPurchases GroupPurchase[] @relation("Creator")  // 생성한 공구
-  participations Participant[]   // 참여한 공구
   bids          Bid[]           // 입찰 내역
-  votes         Vote[]          // 투표 내역
   messages      Message[]       // 채팅 메시지
-  accounts      Account[]
-  sessions      Session[]
 
   @@index([email])
   @@index([phone])
@@ -177,19 +192,55 @@ model Bid {
 }
 
 model Vote {
-  id              String   @id @default(cuid())
-  approved        Boolean  // 찬성/반대
-  createdAt       DateTime @default(now())
-  
-  userId          String
+  id              String        @id @default(cuid())
   groupPurchaseId String
-  
-  user          User          @relation(fields: [userId], references: [id])
-  groupPurchase GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
+  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  vote            Boolean
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  @@unique([userId, groupPurchaseId])
-  @@index([userId])
-  @@index([groupPurchaseId])
+  @@unique([groupPurchaseId, userId])
+}
+
+model Review {
+  id              String        @id @default(cuid())
+  groupPurchaseId String
+  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  rating          Int
+  kindnessRating  Int?
+  accuracyRating  Int?
+  deliveryRating  Int?
+  content         String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Inquiry {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  content   String
+  status    String   @default("PENDING")
+  response  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  content   String
+  type      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Message {

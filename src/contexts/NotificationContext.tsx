@@ -6,17 +6,38 @@ import {
   useEffect,
   useState,
   ReactNode,
+  useRef,
 } from 'react';
 import { useSession } from 'next-auth/react';
 
 interface Notification {
   id: string;
-  type: 'GROUP_PURCHASE' | 'PARTICIPANT' | 'POINT' | 'SYSTEM';
+  type: 
+    | 'GROUP_PURCHASE' 
+    | 'PARTICIPANT' 
+    | 'POINT' 
+    | 'SYSTEM'
+    | 'AUCTION_START'
+    | 'AUCTION_END'
+    | 'VOTE_START'
+    | 'VOTE_REMINDER'
+    | 'VOTE_END'
+    | 'GROUP_CONFIRMED'
+    | 'GROUP_CANCELED'
+    | 'REVIEW_REQUEST'
+    | 'PENALTY';
   title: string;
   message: string;
   isRead: boolean;
   createdAt: Date;
   link?: string;
+  data?: {
+    groupPurchaseId?: string;
+    voteEndTime?: string;
+    currentVotes?: number;
+    totalVotes?: number;
+    penaltyEndTime?: string;
+  };
 }
 
 interface NotificationContextType {
@@ -36,26 +57,35 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const ws = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     if (session?.user) {
       fetchNotifications();
+      setupWebSocket();
     }
+    return () => {
+      if (ws.current) {
+        ws.current.close();
+      }
+    };
   }, [session]);
 
-  useEffect(() => {
-    // WebSocket 연결 설정
-    const ws = new WebSocket(process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001');
+  const setupWebSocket = () => {
+    ws.current = new WebSocket(process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001');
 
-    ws.onmessage = (event) => {
+    ws.current.onmessage = (event) => {
       const notification = JSON.parse(event.data);
-      handleNewNotification(notification);
+      if (notification.userId === session?.user?.id) {
+        handleNewNotification(notification);
+      }
     };
 
-    return () => {
-      ws.close();
+    ws.current.onclose = () => {
+      // Try to reconnect in 5 seconds
+      setTimeout(setupWebSocket, 5000);
     };
-  }, []);
+  };
 
   const fetchNotifications = async () => {
     try {
@@ -71,14 +101,30 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const handleNewNotification = (notification: Notification) => {
     setNotifications(prev => [notification, ...prev]);
-    updateUnreadCount([notification, ...notifications]);
+    setUnreadCount(prev => prev + 1);
     
-    // 브라우저 알림 표시
+    // Show browser notification if permission is granted
     if (Notification.permission === 'granted') {
       new Notification(notification.title, {
         body: notification.message,
-        icon: '/icons/notification-icon.png'
+        icon: '/icon.png'
       });
+    }
+
+    // Handle vote reminders
+    if (notification.type === 'VOTE_REMINDER' && notification.data?.voteEndTime) {
+      const voteEnd = new Date(notification.data.voteEndTime);
+      const timeLeft = voteEnd.getTime() - Date.now();
+      if (timeLeft > 0) {
+        setTimeout(() => {
+          addNotification({
+            type: 'VOTE_END',
+            title: '투표가 종료되었습니다',
+            message: `공구 투표가 종료되었습니다. 결과를 확인해주세요.`,
+            link: `/group-purchases/${notification.data?.groupPurchaseId}`,
+          });
+        }, timeLeft);
+      }
     }
   };
 
