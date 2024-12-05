@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "ts-node --project tsconfig.server.json src/server.ts",
     "build": "prisma generate && next build",
-    "start": "next start",
+    "start": "NODE_ENV=production ts-node --project tsconfig.server.json src/server.ts",
     "lint": "next lint",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -26,6 +26,7 @@
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "@tanstack/react-table": "^8.20.5",
     "@types/bcryptjs": "^2.4.6",
+    "@types/ws": "^8.5.13",
     "axios": "^1.7.8",
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",
@@ -43,6 +44,7 @@
     "react-toastify": "^10.0.6",
     "recharts": "^2.14.1",
     "tailwind-merge": "^2.5.5",
+    "ws": "^8.18.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

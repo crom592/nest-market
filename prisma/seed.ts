@@ -221,6 +221,67 @@ async function main() {
     ],
   });
 
+  // Create notifications for users
+  const notificationTypes = [
+    'GROUP_PURCHASE',
+    'PARTICIPANT',
+    'VOTE_START',
+    'VOTE_REMINDER',
+    'GROUP_CONFIRMED',
+    'REVIEW_REQUEST',
+  ];
+
+  for (const user of users) {
+    // Create sample notifications
+    await Promise.all(
+      Array.from({ length: 5 }).map(async (_, i) => {
+        const type = notificationTypes[Math.floor(Math.random() * notificationTypes.length)];
+        const isRead = Math.random() > 0.5;
+        
+        await prisma.notification.create({
+          data: {
+            userId: user.id,
+            type,
+            title: `Sample Notification ${i + 1}`,
+            content: `This is a sample ${type.toLowerCase()} notification for testing purposes.`,
+            isRead,
+            data: JSON.stringify({
+              groupPurchaseId: groupPurchases[0].id,
+              voteEndTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            }),
+          },
+        });
+      })
+    );
+
+    // Create sample reviews
+    await Promise.all(
+      Array.from({ length: 3 }).map(async () => {
+        await prisma.review.create({
+          data: {
+            userId: user.id,
+            groupPurchaseId: groupPurchases[0].id,
+            rating: Math.floor(Math.random() * 5) + 1,
+            content: 'Sample review content for testing',
+          },
+        });
+      })
+    );
+
+    // Create sample group purchase participants
+    await Promise.all(
+      groupPurchases.slice(0, 3).map(async (gp) => {
+        await prisma.groupPurchaseParticipant.create({
+          data: {
+            userId: user.id,
+            groupPurchaseId: gp.id,
+            status: 'JOINED',
+          },
+        });
+      })
+    );
+  }
+
   console.log('Seed data created successfully');
 }
 

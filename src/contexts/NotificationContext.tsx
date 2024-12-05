@@ -9,6 +9,7 @@ import {
   useRef,
 } from 'react';
 import { useSession } from 'next-auth/react';
+import wsClient from '@/lib/utils/websocket';
 
 interface Notification {
   id: string;
@@ -57,35 +58,25 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const ws = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     if (session?.user) {
       fetchNotifications();
-      setupWebSocket();
-    }
-    return () => {
-      if (ws.current) {
-        ws.current.close();
+      wsClient.connect();
+
+      // Listen for new notifications
+      wsClient.on('notification', handleNewNotification);
+
+      // Request notification permission
+      if ('Notification' in window) {
+        Notification.requestPermission();
       }
+    }
+
+    return () => {
+      wsClient.disconnect();
     };
   }, [session]);
-
-  const setupWebSocket = () => {
-    ws.current = new WebSocket(process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001');
-
-    ws.current.onmessage = (event) => {
-      const notification = JSON.parse(event.data);
-      if (notification.userId === session?.user?.id) {
-        handleNewNotification(notification);
-      }
-    };
-
-    ws.current.onclose = () => {
-      // Try to reconnect in 5 seconds
-      setTimeout(setupWebSocket, 5000);
-    };
-  };
 
   const fetchNotifications = async () => {
     try {
@@ -104,28 +95,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setUnreadCount(prev => prev + 1);
     
     // Show browser notification if permission is granted
-    if (Notification.permission === 'granted') {
+    if ('Notification' in window && Notification.permission === 'granted') {
       new Notification(notification.title, {
         body: notification.message,
         icon: '/icon.png'
       });
     }
 
-    // Handle vote reminders
-    if (notification.type === 'VOTE_REMINDER' && notification.data?.voteEndTime) {
-      const voteEnd = new Date(notification.data.voteEndTime);
-      const timeLeft = voteEnd.getTime() - Date.now();
-      if (timeLeft > 0) {
-        setTimeout(() => {
-          addNotification({
-            type: 'VOTE_END',
-            title: '투표가 종료되었습니다',
-            message: `공구 투표가 종료되었습니다. 결과를 확인해주세요.`,
-            link: `/group-purchases/${notification.data?.groupPurchaseId}`,
-          });
-        }, timeLeft);
-      }
-    }
+    // Play notification sound
+    const audio = new Audio('/notification.mp3');
+    audio.play().catch(console.error);
   };
 
   const updateUnreadCount = (notifs: Notification[]) => {
@@ -156,35 +135,41 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      const response = await fetch(`/api/notifications/${notificationId}/read`, {
-        method: 'POST',
+      const response = await fetch(`/api/notifications/${notificationId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isRead: true }),
       });
-      if (!response.ok) throw new Error('알림 읽음 처리에 실패했습니다');
-      
-      setNotifications(prev =>
-        prev.map(n =>
-          n.id === notificationId ? { ...n, isRead: true } : n
-        )
-      );
-      updateUnreadCount(notifications);
+
+      if (response.ok) {
+        setNotifications(prev =>
+          prev.map(n =>
+            n.id === notificationId ? { ...n, isRead: true } : n
+          )
+        );
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
     } catch (error) {
-      console.error('Failed to mark notification as read:', error);
+      console.error('Error marking notification as read:', error);
     }
   };
 
   const markAllAsRead = async () => {
     try {
-      const response = await fetch('/api/notifications/read-all', {
+      const response = await fetch('/api/notifications/mark-all-read', {
         method: 'POST',
       });
-      if (!response.ok) throw new Error('알림 읽음 처리에 실패했습니다');
-      
-      setNotifications(prev =>
-        prev.map(n => ({ ...n, isRead: true }))
-      );
-      setUnreadCount(0);
+
+      if (response.ok) {
+        setNotifications(prev =>
+          prev.map(n => ({ ...n, isRead: true }))
+        );
+        setUnreadCount(0);
+      }
     } catch (error) {
-      console.error('Failed to mark all notifications as read:', error);
+      console.error('Error marking all notifications as read:', error);
     }
   };
 
