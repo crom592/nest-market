@@ -1,7 +1,7 @@
 import { Server as HTTPServer } from 'http';
-import { Server as WebSocketServer } from 'ws';
+import { WebSocketServer, WebSocket as WSSocket } from 'ws';
 import { parse } from 'url';
-import { getToken } from 'next-auth/jwt';
+import { decode } from 'next-auth/jwt';
 
 interface NotificationMessage {
   type: string;
@@ -11,7 +11,7 @@ interface NotificationMessage {
 
 export class WebSocketHandler {
   private wss: WebSocketServer;
-  private clients: Map<string, WebSocket[]>;
+  private clients: Map<string, WSSocket[]>;
 
   constructor(server: HTTPServer) {
     this.wss = new WebSocketServer({ noServer: true });
@@ -19,53 +19,65 @@ export class WebSocketHandler {
 
     server.on('upgrade', async (request, socket, head) => {
       try {
-        const { pathname } = parse(request.url || '', true);
+        const { pathname, query } = parse(request.url || '', true);
 
         if (pathname !== '/api/ws') {
           socket.destroy();
           return;
         }
 
-        // Verify the token
-        const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-        if (!token || !token.sub) {
+        const token = query.token as string;
+        if (!token) {
           socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
           socket.destroy();
           return;
         }
 
-        this.wss.handleUpgrade(request, socket, head, (ws) => {
-          this.wss.emit('connection', ws, request, token.sub);
-        });
+        try {
+          const decoded = await decode({
+            token,
+            secret: process.env.NEXTAUTH_SECRET || '',
+          });
+
+          if (!decoded?.sub) {
+            throw new Error('Invalid token');
+          }
+
+          this.wss.handleUpgrade(request, socket, head, (ws) => {
+            this.wss.emit('connection', ws, request, decoded.sub);
+          });
+        } catch (error) {
+          console.error('Token verification error:', error);
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+          socket.destroy();
+        }
       } catch (error) {
         console.error('WebSocket upgrade error:', error);
         socket.destroy();
       }
     });
 
-    this.wss.on('connection', (ws: WebSocket, request: any, userId: string) => {
+    this.wss.on('connection', (ws: WSSocket, request: any, userId: string) => {
       this.handleConnection(ws, userId);
     });
   }
 
-  private handleConnection(ws: WebSocket, userId: string) {
-    // Add client to the map
+  private handleConnection(ws: WSSocket, userId: string) {
     if (!this.clients.has(userId)) {
       this.clients.set(userId, []);
     }
     this.clients.get(userId)?.push(ws);
 
-    ws.on('message', (message: string) => {
+    ws.addEventListener('message', (event) => {
       try {
-        const data = JSON.parse(message);
+        const data = JSON.parse(event.data.toString());
         console.log('Received message:', data);
       } catch (error) {
         console.error('Error parsing message:', error);
       }
     });
 
-    ws.on('close', () => {
-      // Remove client from the map
+    ws.addEventListener('close', () => {
       const userClients = this.clients.get(userId);
       if (userClients) {
         const index = userClients.indexOf(ws);
@@ -78,7 +90,10 @@ export class WebSocketHandler {
       }
     });
 
-    // Send initial connection success message
+    ws.addEventListener('error', (error) => {
+      console.error('WebSocket error:', error);
+    });
+
     ws.send(JSON.stringify({ type: 'connected', message: 'WebSocket connection established' }));
   }
 
@@ -94,7 +109,7 @@ export class WebSocketHandler {
       });
 
       userClients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
+        if (client.readyState === WSSocket.OPEN) {
           client.send(message);
         }
       });
@@ -103,7 +118,7 @@ export class WebSocketHandler {
 
   public broadcastMessage(message: any) {
     this.wss.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
+      if (client.readyState === WSSocket.OPEN) {
         client.send(JSON.stringify(message));
       }
     });

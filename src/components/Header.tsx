@@ -26,6 +26,7 @@ export default function Header() {
     { href: '/group-purchases', label: '공구목록' },
     { href: '/about', label: '소개' },
     { href: '/inquiries', label: '문의하기' },
+    ...(session?.user ? [{ href: '/profile', label: '마이페이지' }] : []),
     ...(session?.user?.role === 'ADMIN' ? [{ href: '/admin', label: '관리자' }] : []),
   ];
 

@@ -4,6 +4,7 @@ import { SessionProvider } from '@/components/SessionProvider';
 import './globals.css';
 import Header from '@/components/Header';
 import Footer from '@/components/layout/Footer';
+import { NotificationProvider } from '@/contexts/NotificationContext';
 
 export const metadata: Metadata = {
   title: '둥지마켓 - 소비자 주도형 공동구매 플랫폼',
@@ -24,11 +25,13 @@ export default async function RootLayout({
     <html lang="ko">
       <body className="min-h-screen bg-gray-50 flex flex-col">
         <SessionProvider session={session}>
-          <Header />
-          <main className="flex-grow w-full pt-16">
-            {children}
-          </main>
-          <Footer />
+          <NotificationProvider>
+            <Header />
+            <main className="flex-grow w-full pt-16">
+              {children}
+            </main>
+            <Footer />
+          </NotificationProvider>
         </SessionProvider>
       </body>
     </html>
