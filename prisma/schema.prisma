@@ -106,7 +106,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   groupPurchases GroupPurchase[] @relation("Creator")
-  participations Participation[]
+  participants  Participant[]
   notifications Notification[]
   votes         Vote[]
   reviews       Review[]
@@ -155,6 +155,7 @@ model GroupPurchase {
   bids        Bid[]          // 입찰 목록
   votes       Vote[]         // 투표 목록
   messages    Message[]      // 채팅 메시지
+  reviews     Review[]       // 리뷰 목록
 
   @@index([creatorId])
   @@index([status])
@@ -199,61 +200,69 @@ model Vote {
   user            User          @relation(fields: [userId], references: [id])
   vote            Boolean
   createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
 
-  @@unique([groupPurchaseId, userId])
+  @@unique([userId, groupPurchaseId])
+  @@index([groupPurchaseId])
+  @@index([userId])
 }
 
 model Review {
   id              String        @id @default(cuid())
-  groupPurchaseId String
-  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
-  userId          String
-  user            User          @relation(fields: [userId], references: [id])
-  rating          Int
-  kindnessRating  Int?
-  accuracyRating  Int?
-  deliveryRating  Int?
   content         String
+  rating          Int
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
-}
-
-model Inquiry {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  title     String
-  content   String
-  status    String   @default("PENDING")
-  response  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Notification {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  title     String
-  content   String
-  type      String
-  isRead    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Message {
-  id              String   @id @default(cuid())
-  content         String   // 메시지 내용
-  createdAt       DateTime @default(now())
   
   userId          String
+  user            User          @relation(fields: [userId], references: [id])
   groupPurchaseId String
-  
-  sender        User          @relation(fields: [userId], references: [id])
-  groupPurchase GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
+  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
 
   @@index([userId])
   @@index([groupPurchaseId])
+}
+
+model Inquiry {
+  id              String        @id @default(cuid())
+  title           String
+  content         String
+  answer          String?
+  isAnswered      Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model Notification {
+  id              String        @id @default(cuid())
+  userId          String
+  type            String
+  message         String
+  isRead          Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  
+  user            User          @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Message {
+  id              String        @id @default(cuid())
+  content         String
+  createdAt       DateTime      @default(now())
+  
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  
+  groupPurchaseId String
+  groupPurchase   GroupPurchase @relation(fields: [groupPurchaseId], references: [id])
+
+  @@index([userId])
+  @@index([groupPurchaseId])
+  @@index([createdAt])
 }
