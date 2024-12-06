@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useNotification } from '@/contexts/NotificationContext';
+import { useNotifications } from '@/contexts/NotificationContext';
 import { formatDate } from '@/lib/utils/date';
 
 interface UserStats {
@@ -35,7 +35,7 @@ const getLevelBadge = (level: string) => {
 
 export default function ProfilePage() {
   const { data: session } = useSession();
-  const { notifications } = useNotification();
+  const { notifications } = useNotifications();
   const [userStats, setUserStats] = useState<UserStats>({
     participationCount: 0,
     totalPurchases: 0,

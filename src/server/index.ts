@@ -1,7 +1,8 @@
 import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
-import { WebSocketHandler } from './server/websocket';
+import WebSocket from 'ws';
+import { WebSocketHandler } from './websocket';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
@@ -18,15 +19,13 @@ app.prepare().then(() => {
     } catch (err) {
       console.error('Error occurred handling', req.url, err);
       res.statusCode = 500;
-      res.end('Internal server error');
+      res.end('Internal Server Error');
     }
   });
 
-  // Initialize WebSocket handler
-  const wsHandler = new WebSocketHandler(server);
-
-  // Make the WebSocket handler available globally
-  (global as any).wsHandler = wsHandler;
+  // Initialize WebSocket server
+  const wss = new WebSocket.Server({ server, path: '/ws' });
+  new WebSocketHandler(wss);
 
   server.listen(port, () => {
     console.log(

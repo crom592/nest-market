@@ -1,126 +1,106 @@
 import { Server as HTTPServer } from 'http';
-import { WebSocketServer, WebSocket as WSSocket } from 'ws';
-import { parse } from 'url';
-import { decode } from 'next-auth/jwt';
+import { WebSocket, Server as WSServer } from 'ws';
+import { getSession } from 'next-auth/react';
+import { prisma } from '@/lib/prisma';
 
-interface NotificationMessage {
+interface WebSocketMessage {
   type: string;
-  userId: string;
-  data: any;
+  payload?: any;
+  token?: string;
 }
 
 export class WebSocketHandler {
-  private wss: WebSocketServer;
-  private clients: Map<string, WSSocket[]>;
+  private clients: Map<string, WebSocket> = new Map();
+  private wss: WSServer;
 
-  constructor(server: HTTPServer) {
-    this.wss = new WebSocketServer({ noServer: true });
-    this.clients = new Map();
+  constructor(wss: WSServer) {
+    this.wss = wss;
 
-    server.on('upgrade', async (request, socket, head) => {
-      try {
-        const { pathname, query } = parse(request.url || '', true);
+    this.wss.on('connection', (ws: WebSocket) => {
+      console.log('New WebSocket connection established');
 
-        if (pathname !== '/api/ws') {
-          socket.destroy();
-          return;
-        }
-
-        const token = query.token as string;
-        if (!token) {
-          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-          socket.destroy();
-          return;
-        }
-
+      ws.on('message', async (message: string) => {
         try {
-          const decoded = await decode({
-            token,
-            secret: process.env.NEXTAUTH_SECRET || '',
-          });
-
-          if (!decoded?.sub) {
-            throw new Error('Invalid token');
+          const data: WebSocketMessage = JSON.parse(message.toString());
+          
+          if (data.type === 'auth') {
+            const session = await getSession({ req: { headers: { cookie: `next-auth.session-token=${data.token}` } } });
+            if (session?.user?.email) {
+              this.clients.set(session.user.email, ws);
+              console.log(`User ${session.user.email} authenticated via WebSocket`);
+              
+              // Send confirmation back to client
+              ws.send(JSON.stringify({
+                type: 'auth_success',
+                payload: {
+                  email: session.user.email
+                }
+              }));
+            }
           }
-
-          this.wss.handleUpgrade(request, socket, head, (ws) => {
-            this.wss.emit('connection', ws, request, decoded.sub);
-          });
         } catch (error) {
-          console.error('Token verification error:', error);
-          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-          socket.destroy();
+          console.error('Error processing WebSocket message:', error);
+          ws.send(JSON.stringify({
+            type: 'error',
+            payload: {
+              message: 'Failed to process message'
+            }
+          }));
         }
-      } catch (error) {
-        console.error('WebSocket upgrade error:', error);
-        socket.destroy();
-      }
-    });
+      });
 
-    this.wss.on('connection', (ws: WSSocket, request: any, userId: string) => {
-      this.handleConnection(ws, userId);
+      ws.on('close', () => {
+        console.log('WebSocket connection closed');
+        // Remove client from the map
+        for (const [email, client] of this.clients.entries()) {
+          if (client === ws) {
+            this.clients.delete(email);
+            console.log(`User ${email} disconnected`);
+            break;
+          }
+        }
+      });
+
+      ws.on('error', (error) => {
+        console.error('WebSocket error:', error);
+      });
+
+      // Send initial connection success message
+      ws.send(JSON.stringify({
+        type: 'connected',
+        payload: {
+          message: 'WebSocket connection established'
+        }
+      }));
     });
   }
 
-  private handleConnection(ws: WSSocket, userId: string) {
-    if (!this.clients.has(userId)) {
-      this.clients.set(userId, []);
-    }
-    this.clients.get(userId)?.push(ws);
-
-    ws.addEventListener('message', (event) => {
+  async sendNotification(userEmail: string, notification: any) {
+    const client = this.clients.get(userEmail);
+    if (client?.readyState === WebSocket.OPEN) {
       try {
-        const data = JSON.parse(event.data.toString());
-        console.log('Received message:', data);
+        client.send(JSON.stringify({
+          type: 'notification',
+          payload: notification
+        }));
       } catch (error) {
-        console.error('Error parsing message:', error);
+        console.error(`Error sending notification to ${userEmail}:`, error);
       }
-    });
-
-    ws.addEventListener('close', () => {
-      const userClients = this.clients.get(userId);
-      if (userClients) {
-        const index = userClients.indexOf(ws);
-        if (index !== -1) {
-          userClients.splice(index, 1);
-        }
-        if (userClients.length === 0) {
-          this.clients.delete(userId);
-        }
-      }
-    });
-
-    ws.addEventListener('error', (error) => {
-      console.error('WebSocket error:', error);
-    });
-
-    ws.send(JSON.stringify({ type: 'connected', message: 'WebSocket connection established' }));
-  }
-
-  public sendNotification(notification: NotificationMessage) {
-    const { userId, type, data } = notification;
-    const userClients = this.clients.get(userId);
-
-    if (userClients && userClients.length > 0) {
-      const message = JSON.stringify({
-        type,
-        data,
-        timestamp: new Date().toISOString(),
-      });
-
-      userClients.forEach((client) => {
-        if (client.readyState === WSSocket.OPEN) {
-          client.send(message);
-        }
-      });
     }
   }
 
-  public broadcastMessage(message: any) {
-    this.wss.clients.forEach((client) => {
-      if (client.readyState === WSSocket.OPEN) {
-        client.send(JSON.stringify(message));
+  async broadcastNotification(notification: any) {
+    for (const [email, client] of this.clients.entries()) {
+      if (client.readyState === WebSocket.OPEN) {
+        try {
+          client.send(JSON.stringify({
+            type: 'notification',
+            payload: notification
+          }));
+        } catch (error) {
+          console.error(`Error broadcasting notification to ${email}:`, error);
+        }
       }
-    });
+    }
   }
 }

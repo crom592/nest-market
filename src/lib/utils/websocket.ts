@@ -13,11 +13,14 @@ class WebSocketClient extends EventEmitter {
     const isBrowser = typeof window !== 'undefined';
     const wsHost = process.env.NEXT_PUBLIC_WS_URL || 
       (isBrowser ? window.location.origin.replace(/^http/, 'ws') : 'ws://localhost:3000');
-    this.url = `${wsHost}/api/ws`;
+    this.url = `${wsHost}/ws`;
   }
 
   setToken(token: string) {
     this.token = token;
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: 'auth', token: this.token }));
+    }
   }
 
   connect() {
@@ -36,6 +39,7 @@ class WebSocketClient extends EventEmitter {
 
       this.ws.onopen = () => {
         this.isConnecting = false;
+        console.log('WebSocket connected');
         if (this.token) {
           this.ws?.send(JSON.stringify({ type: 'auth', token: this.token }));
         }
@@ -51,17 +55,17 @@ class WebSocketClient extends EventEmitter {
         }
       };
 
-      this.ws.onclose = () => {
-        this.isConnecting = false;
-        this.ws = null;
-        this.emit('disconnected');
-        this.scheduleReconnect();
-      };
-
       this.ws.onerror = (error) => {
         console.error('WebSocket error:', error);
         this.emit('error', error);
       };
+
+      this.ws.onclose = () => {
+        this.isConnecting = false;
+        console.log('WebSocket disconnected, attempting to reconnect...');
+        this.scheduleReconnect();
+      };
+
     } catch (error) {
       this.isConnecting = false;
       console.error('Failed to create WebSocket connection:', error);
@@ -74,8 +78,9 @@ class WebSocketClient extends EventEmitter {
       clearTimeout(this.reconnectTimer);
     }
     this.reconnectTimer = setTimeout(() => {
+      console.log('Attempting to reconnect WebSocket...');
       this.connect();
-    }, 5000); // Try to reconnect after 5 seconds
+    }, 5000);
   }
 
   disconnect() {
