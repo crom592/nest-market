@@ -35,9 +35,14 @@ export default function Header() {
       isScrolled ? 'bg-white/80 backdrop-blur-md shadow-sm' : 'bg-gradient-to-b from-gray-900/50 to-transparent'
     }`}>
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-        <Link href="/" className={`text-2xl font-bold tracking-wider ${
+        <Link href="/" className={`text-2xl font-bold tracking-wider flex items-center gap-2 ${
           isScrolled ? 'text-gray-900' : 'text-white'
         }`}>
+          <img 
+            src="/logo.png" 
+            alt="둥지마켓 로고" 
+            className="h-8 w-auto"
+          />
           둥지 마켓
         </Link>
         
